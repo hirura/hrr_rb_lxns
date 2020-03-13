@@ -13,6 +13,12 @@ rvm:
   - ruby-head
 jobs:
   allow_failures:
+  - rvm: 2.0
+  - rvm: 2.1
+  - rvm: 2.2
+  - rvm: 2.3
+  - rvm: 2.4
+  - rvm: 2.5
   - rvm: ruby-head
 before_install:
   - gem uninstall -v '>= 2' -i $(rvm gemdir)@global -ax bundler || true
