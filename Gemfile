@@ -1,6 +1,5 @@
 source "https://rubygems.org"
 
-# Specify your gem's dependencies in hrr_rb_lxns.gemspec
 gemspec
 
 gem "rake", "~> 12.0"
