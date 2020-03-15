@@ -25,7 +25,7 @@ VALUE rb_mHrrRbLxnsConst;
  * @param flags [Integer] Represents the namespaces to disassociate.
  * @return [Integer] 0.
  * @raise [TypeError] In case the given flags cannot be converted to integer.
- * @raise [Errno::EXXX]  In case unshare(2) system call failed.
+ * @raise [Errno::EXXX] In case unshare(2) system call failed.
  */
 VALUE
 hrr_rb_lxns_unshare(VALUE self, VALUE flags)
@@ -36,12 +36,45 @@ hrr_rb_lxns_unshare(VALUE self, VALUE flags)
   return INT2FIX(0);
 }
 
+/*
+ * A primitive wrapper around setns(2) system call.
+ * Associates the caller with the corresponding namespace of the given fd.
+ *
+ * == Synopsis:
+ *   pid = fork do
+ *     File.readlink "/proc/self/ns/uts"       # => uts:[xxx]
+ *     HrrRbLxns.__unshare__ HrrRbLxns::NEWUTS # => 0
+ *     File.readlink "/proc/self/ns/uts"       # => uts:[yyy]
+ *     sleep
+ *   end
+ *   File.readlink "/proc/self/ns/uts"                  # => uts:[xxx]
+ *   fd = File.open "/proc/#{pid}/ns/uts", File::RDONLY
+ *   HrrRbLxns.__setns__ fd.fileno, HrrRbLxns::NEWUTS   # => 0
+ *   fd.close
+ *   File.readlink "/proc/self/ns/uts"                  # => uts:[yyy]
+ *
+ * @param fd [Integer] The file descriptor number to associate.
+ * @param nstype [Integer] Represents the namespace to associate.
+ * @return [Integer] 0.
+ * @raise [TypeError] In case the given fd cannot be converted to integer  or the given nstype cannot be converted to integer.
+ * @raise [Errno::EXXX] In case setns(2) system call failed.
+ */
+VALUE
+hrr_rb_lxns_setns(VALUE self, VALUE fd, VALUE nstype)
+{
+  if (setns(NUM2INT(fd), NUM2INT(nstype)) < 0)
+    rb_sys_fail("setns");
+
+  return INT2FIX(0);
+}
+
 void
 Init_hrr_rb_lxns(void)
 {
   rb_mHrrRbLxns = rb_define_module("HrrRbLxns");
 
   rb_define_singleton_method(rb_mHrrRbLxns, "__unshare__", hrr_rb_lxns_unshare, 1);
+  rb_define_singleton_method(rb_mHrrRbLxns, "__setns__",   hrr_rb_lxns_setns,   2);
 
   rb_mHrrRbLxnsConst = rb_define_module_under(rb_mHrrRbLxns, "Constants");
   rb_include_module(rb_mHrrRbLxns, rb_mHrrRbLxnsConst);
