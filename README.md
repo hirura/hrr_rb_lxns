@@ -20,7 +20,11 @@ Or install it yourself as:
 
 ## Usage
 
-The basic usage is as follows.
+hrr_rb_lxns provides unshare and setns wrappers.
+
+### Unshare
+
+HrrRbLxns.unshare method wraps around unshare(2) system call. The system call disassociates the caller process's namespace.
 
 ```ruby
 require "hrr_rb_lxns"
@@ -36,6 +40,29 @@ File.readlink "/proc/self/ns/mnt"   # => mnt:[bbb]
 HrrRbLxns.unshare "um"              # => 0
 File.readlink "/proc/self/ns/uts"   # => uts:[xxx]
 File.readlink "/proc/self/ns/mnt"   # => mnt:[yyy]
+```
+
+### Setns
+
+HrrRbLxns.setns method wraps around setns(2) system call. The system call associate the caller process's namespace to an existing one, which is disassociated by some other process.
+
+```ruby
+# Before doing setns, prepare a disassociated namespace with using unshare.
+# The unshare(2) system call disassociate the caller process's namespace, so
+# do fork the process and unshare in the child process.
+# To keep the disassociated namespase, do sleep at last in the child.
+pid = fork do
+  # Disassociates uts namespace
+  File.readlink "/proc/self/ns/uts"    # => uts:[xxx]
+  HrrRbLxns.unshare HrrRbLxns::NEWUTS  # => 0
+  File.readlink "/proc/self/ns/uts"    # => uts:[yyy]
+  sleep
+end
+
+# Aassociates uts namespace
+File.readlink "/proc/self/ns/uts"      # => uts:[xxx]
+HrrRbLxns.setns HrrRbLxns::NEWUTS, pid # => 0
+File.readlink "/proc/self/ns/uts"      # => uts:[yyy]
 ```
 
 ## Development
