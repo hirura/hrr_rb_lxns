@@ -85,6 +85,31 @@ module HrrRbLxns
     end
   end
 
+  private
+
+  def self.interpret_flags arg
+    case arg
+    when Integer then arg
+    when String  then chars_to_flags arg
+    else raise TypeError, "unsupported flags: #{arg.inspect}"
+    end
+  end
+
+  def self.chars_to_flags chars
+    chars.each_char.inject(0) do |f, c|
+      if    c == "i" && const_defined?(:NEWIPC)    then f | NEWIPC
+      elsif c == "m" && const_defined?(:NEWNS)     then f | NEWNS
+      elsif c == "n" && const_defined?(:NEWNET)    then f | NEWNET
+      elsif c == "p" && const_defined?(:NEWPID)    then f | NEWPID
+      elsif c == "u" && const_defined?(:NEWUTS)    then f | NEWUTS
+      elsif c == "U" && const_defined?(:NEWUSER)   then f | NEWUSER
+      elsif c == "C" && const_defined?(:NEWCGROUP) then f | NEWCGROUP
+      elsif c == "T" && const_defined?(:NEWTIME)   then f | NEWTIME
+      else raise ArgumentError, "unsupported flag charactor: #{c.inspect}"
+      end
+    end
+  end
+
   def self.get_fds flags, pid
     list = Array.new
     list.push ["ipc",    NEWIPC   ] if const_defined?(:NEWIPC)
@@ -108,31 +133,6 @@ module HrrRbLxns
       "/proc/#{pid}/ns/#{name}"
     else
       nil
-    end
-  end
-
-  private
-
-  def self.interpret_flags arg
-    case arg
-    when Integer then arg
-    when String  then chars_to_flags arg
-    else raise TypeError, "unsupported flags: #{arg.inspect}"
-    end
-  end
-
-  def self.chars_to_flags chars
-    chars.each_char.inject(0) do |f, c|
-      if    c == "i" && const_defined?(:NEWIPC)    then f | NEWIPC
-      elsif c == "m" && const_defined?(:NEWNS)     then f | NEWNS
-      elsif c == "n" && const_defined?(:NEWNET)    then f | NEWNET
-      elsif c == "p" && const_defined?(:NEWPID)    then f | NEWPID
-      elsif c == "u" && const_defined?(:NEWUTS)    then f | NEWUTS
-      elsif c == "U" && const_defined?(:NEWUSER)   then f | NEWUSER
-      elsif c == "C" && const_defined?(:NEWCGROUP) then f | NEWCGROUP
-      elsif c == "T" && const_defined?(:NEWTIME)   then f | NEWTIME
-      else raise ArgumentError, "unsupported flag charactor: #{c.inspect}"
-      end
     end
   end
 end
