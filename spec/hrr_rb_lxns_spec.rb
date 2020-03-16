@@ -12,37 +12,80 @@ RSpec.describe HrrRbLxns do
     expect(HrrRbLxns::Constants.constants).to include *HrrRbLxns::Constants.constants
   end
 
-  describe ".unshare" do
-    fork_yield1_yield2 = lambda{ |blk1, blk2|
-      r, w = IO.pipe
-      begin
-        pid = fork do
-          blk1.call
-          w.write blk2.call
-        end
-        w.close
-        Process.waitpid pid
-        raise RuntimeError, "forked process exited with non-zero status." unless $?.to_i.zero?
-        r.read
-      ensure
-        r.close
+
+  fork_yld1_yld2 = lambda{ |blk1, blk2|
+    r, w = IO.pipe
+    begin
+      pid = fork do
+        blk1.call
+        w.write blk2.call
       end
-    }
+      w.close
+      Process.waitpid pid
+      raise RuntimeError, "forked process exited with non-zero status." unless $?.to_i.zero?
+      r.read
+    ensure
+      r.close
+    end
+  }
 
-    fork_yield1_fork_yield2 = lambda{ |blk1, blk2|
-      fork_yield1_yield2.call blk1, lambda{ fork_yield1_yield2.call lambda{}, blk2 }
-    }
+  fork_yld1_fork_yld2 = lambda{ |blk1, blk2|
+    fork_yld1_yld2.call blk1, lambda{ fork_yld1_yld2.call lambda{}, blk2 }
+  }
 
-    namespaces = Hash.new
-    namespaces["mnt"]    = {short: "m", long: "NEWNS",     flag: HrrRbLxns::NEWNS,     func: fork_yield1_yield2     } if HrrRbLxns.const_defined? :NEWNS
-    namespaces["uts"]    = {short: "u", long: "NEWUTS",    flag: HrrRbLxns::NEWUTS,    func: fork_yield1_yield2     } if HrrRbLxns.const_defined? :NEWUTS
-    namespaces["ipc"]    = {short: "i", long: "NEWIPC",    flag: HrrRbLxns::NEWIPC,    func: fork_yield1_yield2     } if HrrRbLxns.const_defined? :NEWIPC
-    namespaces["net"]    = {short: "n", long: "NEWNET",    flag: HrrRbLxns::NEWNET,    func: fork_yield1_yield2     } if HrrRbLxns.const_defined? :NEWNET
-    namespaces["pid"]    = {short: "p", long: "NEWPID",    flag: HrrRbLxns::NEWPID,    func: fork_yield1_fork_yield2} if HrrRbLxns.const_defined? :NEWPID
-    namespaces["user"]   = {short: "U", long: "NEWUSER",   flag: HrrRbLxns::NEWUSER,   func: fork_yield1_yield2     } if HrrRbLxns.const_defined? :NEWUSER
-    namespaces["cgroup"] = {short: "C", long: "NEWCGROUP", flag: HrrRbLxns::NEWCGROUP, func: fork_yield1_yield2     } if HrrRbLxns.const_defined? :NEWCGROUP
-    namespaces["time"]   = {short: "T", long: "NEWTIME",   flag: HrrRbLxns::NEWTIME,   func: fork_yield1_yield2     } if HrrRbLxns.const_defined? :NEWTIME
+  fork_yld1_yld2_wait = lambda{ |blk1, blk2|
+    begin
+      c2p_r, c2p_w, p2c_r, p2c_w = IO.pipe + IO.pipe
+      pid = fork do
+        p2c_w.close
+        c2p_r.close
+        blk1.call
+        c2p_w.write blk2.call
+        c2p_w.close
+        p2c_r.read
+      end
+      c2p_w.close
+      p2c_r.close
+      [pid, [pid, c2p_r.read], p2c_w]
+    ensure
+      [c2p_r, c2p_w, p2c_r].each{ |io| io.close rescue nil }
+    end
+  }
 
+  fork_yld1_fork_yld2_wait = lambda{ |blk1, blk2|
+    begin
+      c2p_r, c2p_w, p2c_r, p2c_w = IO.pipe + IO.pipe
+      pid = fork do
+        p2c_w.close
+        c2p_r.close
+        blk1.call
+        pid_to_wait, (pid_target, target), pipe = fork_yld1_yld2_wait.call lambda{ [c2p_w, p2c_r].each{ |io| io.close rescue nil } }, blk2
+        c2p_w.write Marshal.dump([pid_target, target])
+        c2p_w.close
+        p2c_r.read
+        pipe.close rescue nil
+        Process.waitpid pid_to_wait
+        raise RuntimeError, "forked process exited with non-zero status." unless $?.to_i.zero?
+      end
+      c2p_w.close
+      p2c_r.close
+      [pid, Marshal.load(c2p_r.read), p2c_w]
+    ensure
+      [c2p_r, c2p_w, p2c_r].each{ |io| io.close rescue nil }
+    end
+  }
+
+  namespaces = Hash.new
+  namespaces["mnt"]    = {short: "m", long: "NEWNS",     flag: HrrRbLxns::NEWNS,     func1: fork_yld1_yld2,      func2: fork_yld1_yld2_wait     } if HrrRbLxns.const_defined? :NEWNS
+  namespaces["uts"]    = {short: "u", long: "NEWUTS",    flag: HrrRbLxns::NEWUTS,    func1: fork_yld1_yld2,      func2: fork_yld1_yld2_wait     } if HrrRbLxns.const_defined? :NEWUTS
+  namespaces["ipc"]    = {short: "i", long: "NEWIPC",    flag: HrrRbLxns::NEWIPC,    func1: fork_yld1_yld2,      func2: fork_yld1_yld2_wait     } if HrrRbLxns.const_defined? :NEWIPC
+  namespaces["net"]    = {short: "n", long: "NEWNET",    flag: HrrRbLxns::NEWNET,    func1: fork_yld1_yld2,      func2: fork_yld1_yld2_wait     } if HrrRbLxns.const_defined? :NEWNET
+  namespaces["pid"]    = {short: "p", long: "NEWPID",    flag: HrrRbLxns::NEWPID,    func1: fork_yld1_fork_yld2, func2: fork_yld1_fork_yld2_wait} if HrrRbLxns.const_defined? :NEWPID
+  namespaces["user"]   = {short: "U", long: "NEWUSER",   flag: HrrRbLxns::NEWUSER,   func1: fork_yld1_yld2,      func2: fork_yld1_yld2_wait     } if HrrRbLxns.const_defined? :NEWUSER
+  namespaces["cgroup"] = {short: "C", long: "NEWCGROUP", flag: HrrRbLxns::NEWCGROUP, func1: fork_yld1_yld2,      func2: fork_yld1_yld2_wait     } if HrrRbLxns.const_defined? :NEWCGROUP
+  namespaces["time"]   = {short: "T", long: "NEWTIME",   flag: HrrRbLxns::NEWTIME,   func1: fork_yld1_yld2,      func2: fork_yld1_yld2_wait     } if HrrRbLxns.const_defined? :NEWTIME
+
+  describe ".unshare" do
     context "with no options" do
       0.upto(namespaces.size) do |n|
         namespaces.keys.combination(n).each do |c|
@@ -56,7 +99,7 @@ RSpec.describe HrrRbLxns do
               it "disassociates #{targets.inspect} namespaces" do
                 targets.each{ |ns|
                   before = File.readlink "/proc/self/ns/#{ns}"
-                  after = namespaces[ns][:func].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                  after = namespaces[ns][:func1].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
                   expect( after ).not_to eq before
                 }
               end
@@ -66,7 +109,7 @@ RSpec.describe HrrRbLxns do
               it "keeps #{others.inspect} namespaces" do
                 others.each{ |ns|
                   before = File.readlink "/proc/self/ns/#{ns}"
-                  after = namespaces[ns][:func].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                  after = namespaces[ns][:func1].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
                   expect( after ).to eq before
                 }
               end
@@ -87,7 +130,7 @@ RSpec.describe HrrRbLxns do
               it "disassociates #{targets.inspect} namespaces" do
                 targets.each{ |ns|
                   before = File.readlink "/proc/self/ns/#{ns}"
-                  after = namespaces[ns][:func].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                  after = namespaces[ns][:func1].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
                   expect( after ).not_to eq before
                 }
               end
@@ -97,7 +140,7 @@ RSpec.describe HrrRbLxns do
               it "keeps #{others.inspect} namespaces" do
                 others.each{ |ns|
                   before = File.readlink "/proc/self/ns/#{ns}"
-                  after = namespaces[ns][:func].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                  after = namespaces[ns][:func1].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
                   expect( after ).to eq before
                 }
               end
@@ -123,78 +166,6 @@ RSpec.describe HrrRbLxns do
   end
 
   describe ".setns" do
-    unshare = lambda{ |blk1, blk2|
-      begin
-        c2p_r, c2p_w, p2c_r, p2c_w = IO.pipe + IO.pipe
-        pid = fork do
-          p2c_w.close
-          c2p_r.close
-          blk1.call
-          c2p_w.write blk2.call
-          c2p_w.close
-          p2c_r.read
-        end
-        c2p_w.close
-        p2c_r.close
-        [pid, [pid, c2p_r.read], p2c_w]
-      ensure
-        [c2p_r, c2p_w, p2c_r].each{ |io| io.close rescue nil }
-      end
-    }
-
-    unshare_fork = lambda{ |blk1, blk2|
-      begin
-        c2p_r, c2p_w, p2c_r, p2c_w = IO.pipe + IO.pipe
-        pid = fork do
-          p2c_w.close
-          c2p_r.close
-          blk1.call
-          pid, (pid_unshared, result), pipe = unshare.call lambda{ [c2p_w, p2c_r].each{ |io| io.close rescue nil } }, blk2
-          c2p_w.write Marshal.dump([pid_unshared, result])
-          c2p_w.close
-          p2c_r.read
-          pipe.close rescue nil
-          Process.waitpid pid
-          raise RuntimeError, "forked process exited with non-zero status." unless $?.to_i.zero?
-        end
-        c2p_w.close
-        p2c_r.close
-        [pid, Marshal.load(c2p_r.read), p2c_w]
-      ensure
-        [c2p_r, c2p_w, p2c_r].each{ |io| io.close rescue nil }
-      end
-    }
-
-    fork_yield1_yield2 = lambda{ |blk1, blk2|
-      r, w = IO.pipe
-      begin
-        pid = fork do
-          blk1.call
-          w.write blk2.call
-        end
-        w.close
-        Process.waitpid pid
-        raise RuntimeError, "forked process exited with non-zero status." unless $?.to_i.zero?
-        r.read
-      ensure
-        r.close
-      end
-    }
-
-    fork_yield1_fork_yield2 = lambda{ |blk1, blk2|
-      fork_yield1_yield2.call blk1, lambda{ fork_yield1_yield2.call lambda{}, blk2 }
-    }
-
-    namespaces = Hash.new
-    namespaces["mnt"]    = {short: "m", long: "NEWNS",     flag: HrrRbLxns::NEWNS,     unshare: unshare,      func: fork_yield1_yield2     } if HrrRbLxns.const_defined? :NEWNS
-    namespaces["uts"]    = {short: "u", long: "NEWUTS",    flag: HrrRbLxns::NEWUTS,    unshare: unshare,      func: fork_yield1_yield2     } if HrrRbLxns.const_defined? :NEWUTS
-    namespaces["ipc"]    = {short: "i", long: "NEWIPC",    flag: HrrRbLxns::NEWIPC,    unshare: unshare,      func: fork_yield1_yield2     } if HrrRbLxns.const_defined? :NEWIPC
-    namespaces["net"]    = {short: "n", long: "NEWNET",    flag: HrrRbLxns::NEWNET,    unshare: unshare,      func: fork_yield1_yield2     } if HrrRbLxns.const_defined? :NEWNET
-    namespaces["pid"]    = {short: "p", long: "NEWPID",    flag: HrrRbLxns::NEWPID,    unshare: unshare_fork, func: fork_yield1_fork_yield2} if HrrRbLxns.const_defined? :NEWPID
-    namespaces["user"]   = {short: "U", long: "NEWUSER",   flag: HrrRbLxns::NEWUSER,   unshare: unshare,      func: fork_yield1_yield2     } if HrrRbLxns.const_defined? :NEWUSER
-    namespaces["cgroup"] = {short: "C", long: "NEWCGROUP", flag: HrrRbLxns::NEWCGROUP, unshare: unshare,      func: fork_yield1_yield2     } if HrrRbLxns.const_defined? :NEWCGROUP
-    namespaces["time"]   = {short: "T", long: "NEWTIME",   flag: HrrRbLxns::NEWTIME,   unshare: unshare,      func: fork_yield1_yield2     } if HrrRbLxns.const_defined? :NEWTIME
-
     context "with no options" do
       0.upto(namespaces.size) do |n|
         namespaces.keys.combination(n).each do |c|
@@ -208,18 +179,18 @@ RSpec.describe HrrRbLxns do
               it "associates #{targets.inspect} namespaces" do
                 targets.each{ |ns|
                   before = File.readlink "/proc/self/ns/#{ns}"
-                  unshared = nil
+                  target = nil
                   after = nil
                   begin
-                    pid, (unshared_pid, unshared), pipe = namespaces[ns][:unshare].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
-                    after = namespaces[ns][:func].call lambda{ HrrRbLxns.setns flags, unshared_pid }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                    pid_to_wait, (pid_target, target), pipe = namespaces[ns][:func2].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                    after = namespaces[ns][:func1].call lambda{ HrrRbLxns.setns flags, pid_target }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
                   ensure
                     pipe.close rescue nil
-                    Process.waitpid pid
+                    Process.waitpid pid_to_wait
                     raise RuntimeError, "forked process exited with non-zero status." unless $?.to_i.zero?
                   end
                   expect( after ).not_to eq before
-                  expect( after ).to eq unshared
+                  expect( after ).to eq target
                 }
               end
             end
@@ -228,18 +199,18 @@ RSpec.describe HrrRbLxns do
               it "keeps #{others.inspect} namespaces" do
                 others.each{ |ns|
                   before = File.readlink "/proc/self/ns/#{ns}"
-                  unshared = nil
+                  target = nil
                   after = nil
                   begin
-                    pid, (unshared_pid, unshared), pipe = namespaces[ns][:unshare].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
-                    after = namespaces[ns][:func].call lambda{ HrrRbLxns.setns flags, unshared_pid }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                    pid_to_wait, (pid_target, target), pipe = namespaces[ns][:func2].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                    after = namespaces[ns][:func1].call lambda{ HrrRbLxns.setns flags, pid_target }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
                   ensure
                     pipe.close rescue nil
-                    Process.waitpid pid
+                    Process.waitpid pid_to_wait
                     raise RuntimeError, "forked process exited with non-zero status." unless $?.to_i.zero?
                   end
                   expect( after ).to eq before
-                  expect( after ).to eq unshared
+                  expect( after ).to eq target
                 }
               end
             end
@@ -259,18 +230,18 @@ RSpec.describe HrrRbLxns do
               it "associates #{targets.inspect} namespaces" do
                 targets.each{ |ns|
                   before = File.readlink "/proc/self/ns/#{ns}"
-                  unshared = nil
+                  target = nil
                   after = nil
                   begin
-                    pid, (unshared_pid, unshared), pipe = namespaces[ns][:unshare].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
-                    after = namespaces[ns][:func].call lambda{ HrrRbLxns.setns flags, unshared_pid }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                    pid_to_wait, (pid_target, target), pipe = namespaces[ns][:func2].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                    after = namespaces[ns][:func1].call lambda{ HrrRbLxns.setns flags, pid_target }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
                   ensure
                     pipe.close rescue nil
-                    Process.waitpid pid
+                    Process.waitpid pid_to_wait
                     raise RuntimeError, "forked process exited with non-zero status." unless $?.to_i.zero?
                   end
                   expect( after ).not_to eq before
-                  expect( after ).to eq unshared
+                  expect( after ).to eq target
                 }
               end
             end
@@ -279,18 +250,18 @@ RSpec.describe HrrRbLxns do
               it "keeps #{others.inspect} namespaces" do
                 others.each{ |ns|
                   before = File.readlink "/proc/self/ns/#{ns}"
-                  unshared = nil
+                  target = nil
                   after = nil
                   begin
-                    pid, (unshared_pid, unshared), pipe = namespaces[ns][:unshare].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
-                    after = namespaces[ns][:func].call lambda{ HrrRbLxns.setns flags, unshared_pid }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                    pid_to_wait, (pid_target, target), pipe = namespaces[ns][:func2].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                    after = namespaces[ns][:func1].call lambda{ HrrRbLxns.setns flags, pid_target }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
                   ensure
                     pipe.close rescue nil
-                    Process.waitpid pid
+                    Process.waitpid pid_to_wait
                     raise RuntimeError, "forked process exited with non-zero status." unless $?.to_i.zero?
                   end
                   expect( after ).to eq before
-                  expect( after ).to eq unshared
+                  expect( after ).to eq target
                 }
               end
             end
