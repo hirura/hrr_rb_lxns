@@ -9,7 +9,7 @@ VALUE rb_mHrrRbLxnsConst;
  * A primitive wrapper around unshare(2) system call.
  * Disassociates parts of the caller process's execution context.
  *
- * == Synopsis:
+ * @example
  *   # Disassociates uts namespace
  *   File.readlink "/proc/self/ns/uts"       # => uts:[aaa]
  *   HrrRbLxns.__unshare__ HrrRbLxns::NEWUTS # => 0
@@ -40,7 +40,7 @@ hrr_rb_lxns_unshare(VALUE self, VALUE flags)
  * A primitive wrapper around setns(2) system call.
  * Associates the caller with the corresponding namespace of the given fd.
  *
- * == Synopsis:
+ * @example
  *   pid = fork do
  *     File.readlink "/proc/self/ns/uts"       # => uts:[xxx]
  *     HrrRbLxns.__unshare__ HrrRbLxns::NEWUTS # => 0

@@ -10,7 +10,7 @@ module HrrRbLxns
 
   # A wrapper around unshare(2) system call.
   #
-  # == Synopsis:
+  # @example
   #   # Disassociates uts namespace
   #   File.readlink "/proc/self/ns/uts"   # => uts:[aaa]
   #   HrrRbLxns.unshare HrrRbLxns::NEWUTS # => 0
@@ -44,7 +44,7 @@ module HrrRbLxns
 
   # A wrapper around setns(2) system call.
   #
-  # == Synopsis:
+  # @example
   #   pid = fork do
   #     # Disassociates uts namespace
   #     File.readlink "/proc/self/ns/uts"    # => uts:[xxx]
