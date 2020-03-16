@@ -33,11 +33,12 @@ module HrrRbLxns
   #   "U" : NEWUSER <br>
   #   "C" : NEWCGROUP <br>
   #   "T" : NEWTIME <br>
+  # @param options [Hash] For future use.
   # @return [Integer] 0.
   # @raise [ArgumentError] When given flags argument is not appropriate.
   # @raise [Errno::EXXX] In case unshare(2) system call failed.
 
-  def self.unshare flags
+  def self.unshare flags, options={}
     _flags = interpret_flags flags
     __unshare__ _flags
   end
@@ -67,10 +68,11 @@ module HrrRbLxns
   #   "U" : NEWUSER <br>
   #   "C" : NEWCGROUP <br>
   #   "T" : NEWTIME <br>
+  # @param options [Hash] For future use.
   # @return [Integer] 0.
   # @raise [ArgumentError] When given flags argument is not appropriate.
   # @raise [Errno::EXXX] In case setns(2) system call failed.
-  def self.setns flags, pid
+  def self.setns flags, pid, options={}
     _flags = interpret_flags flags
     fds = get_fds _flags, pid
     fds.each do |path, nstype|

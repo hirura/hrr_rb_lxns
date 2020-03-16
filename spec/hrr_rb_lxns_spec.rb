@@ -43,62 +43,64 @@ RSpec.describe HrrRbLxns do
     namespaces["cgroup"] = {short: "C", long: "NEWCGROUP", flag: HrrRbLxns::NEWCGROUP, func: fork_yield1_yield2     } if HrrRbLxns.const_defined? :NEWCGROUP
     namespaces["time"]   = {short: "T", long: "NEWTIME",   flag: HrrRbLxns::NEWTIME,   func: fork_yield1_yield2     } if HrrRbLxns.const_defined? :NEWTIME
 
-    0.upto(namespaces.size) do |n|
-      namespaces.keys.combination(n).each do |c|
-        targets = c
-        others  = namespaces.keys - targets
+    context "with no options" do
+      0.upto(namespaces.size) do |n|
+        namespaces.keys.combination(n).each do |c|
+          targets = c
+          others  = namespaces.keys - targets
 
-        flags = targets.inject(""){|fs, t| fs + namespaces[t][:short]}
+          flags = targets.inject(""){|fs, t| fs + namespaces[t][:short]}
 
-        context "with #{flags.inspect} flags" do
-          unless targets.empty?
-            it "disassociates #{targets.inspect} namespaces" do
-              targets.each{ |ns|
-                before = File.readlink "/proc/self/ns/#{ns}"
-                after = namespaces[ns][:func].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
-                expect( after ).not_to eq before
-              }
+          context "with #{flags.inspect} flags" do
+            unless targets.empty?
+              it "disassociates #{targets.inspect} namespaces" do
+                targets.each{ |ns|
+                  before = File.readlink "/proc/self/ns/#{ns}"
+                  after = namespaces[ns][:func].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                  expect( after ).not_to eq before
+                }
+              end
             end
-          end
 
-          unless others.empty?
-            it "keeps #{others.inspect} namespaces" do
-              others.each{ |ns|
-                before = File.readlink "/proc/self/ns/#{ns}"
-                after = namespaces[ns][:func].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
-                expect( after ).to eq before
-              }
+            unless others.empty?
+              it "keeps #{others.inspect} namespaces" do
+                others.each{ |ns|
+                  before = File.readlink "/proc/self/ns/#{ns}"
+                  after = namespaces[ns][:func].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                  expect( after ).to eq before
+                }
+              end
             end
           end
         end
       end
-    end
 
-    0.upto(namespaces.size) do |n|
-      namespaces.keys.combination(n).each do |c|
-        targets = c
-        others  = namespaces.keys - targets
+      0.upto(namespaces.size) do |n|
+        namespaces.keys.combination(n).each do |c|
+          targets = c
+          others  = namespaces.keys - targets
 
-        flags = targets.inject(0){|fs, t| fs | namespaces[t][:flag]}
+          flags = targets.inject(0){|fs, t| fs | namespaces[t][:flag]}
 
-        context "with (#{targets.inject([]){|fs, t| fs + [namespaces[t][:long]]}.join(" | ")}) flags" do
-          unless targets.empty?
-            it "disassociates #{targets.inspect} namespaces" do
-              targets.each{ |ns|
-                before = File.readlink "/proc/self/ns/#{ns}"
-                after = namespaces[ns][:func].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
-                expect( after ).not_to eq before
-              }
+          context "with (#{targets.inject([]){|fs, t| fs + [namespaces[t][:long]]}.join(" | ")}) flags" do
+            unless targets.empty?
+              it "disassociates #{targets.inspect} namespaces" do
+                targets.each{ |ns|
+                  before = File.readlink "/proc/self/ns/#{ns}"
+                  after = namespaces[ns][:func].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                  expect( after ).not_to eq before
+                }
+              end
             end
-          end
 
-          unless others.empty?
-            it "keeps #{others.inspect} namespaces" do
-              others.each{ |ns|
-                before = File.readlink "/proc/self/ns/#{ns}"
-                after = namespaces[ns][:func].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
-                expect( after ).to eq before
-              }
+            unless others.empty?
+              it "keeps #{others.inspect} namespaces" do
+                others.each{ |ns|
+                  before = File.readlink "/proc/self/ns/#{ns}"
+                  after = namespaces[ns][:func].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                  expect( after ).to eq before
+                }
+              end
             end
           end
         end
@@ -193,102 +195,104 @@ RSpec.describe HrrRbLxns do
     namespaces["cgroup"] = {short: "C", long: "NEWCGROUP", flag: HrrRbLxns::NEWCGROUP, unshare: unshare,      func: fork_yield1_yield2     } if HrrRbLxns.const_defined? :NEWCGROUP
     namespaces["time"]   = {short: "T", long: "NEWTIME",   flag: HrrRbLxns::NEWTIME,   unshare: unshare,      func: fork_yield1_yield2     } if HrrRbLxns.const_defined? :NEWTIME
 
-    0.upto(namespaces.size) do |n|
-      namespaces.keys.combination(n).each do |c|
-        targets = c
-        others  = namespaces.keys - targets
+    context "with no options" do
+      0.upto(namespaces.size) do |n|
+        namespaces.keys.combination(n).each do |c|
+          targets = c
+          others  = namespaces.keys - targets
 
-        flags = targets.inject(""){|fs, t| fs + namespaces[t][:short]}
+          flags = targets.inject(""){|fs, t| fs + namespaces[t][:short]}
 
-        context "with #{flags.inspect} flags" do
-          unless targets.empty?
-            it "associates #{targets.inspect} namespaces" do
-              targets.each{ |ns|
-                before = File.readlink "/proc/self/ns/#{ns}"
-                unshared = nil
-                after = nil
-                begin
-                  pid, (unshared_pid, unshared), pipe = namespaces[ns][:unshare].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
-                  after = namespaces[ns][:func].call lambda{ HrrRbLxns.setns flags, unshared_pid }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
-                ensure
-                  pipe.close rescue nil
-                  Process.waitpid pid
-                  raise RuntimeError, "forked process exited with non-zero status." unless $?.to_i.zero?
-                end
-                expect( after ).not_to eq before
-                expect( after ).to eq unshared
-              }
+          context "with #{flags.inspect} flags" do
+            unless targets.empty?
+              it "associates #{targets.inspect} namespaces" do
+                targets.each{ |ns|
+                  before = File.readlink "/proc/self/ns/#{ns}"
+                  unshared = nil
+                  after = nil
+                  begin
+                    pid, (unshared_pid, unshared), pipe = namespaces[ns][:unshare].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                    after = namespaces[ns][:func].call lambda{ HrrRbLxns.setns flags, unshared_pid }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                  ensure
+                    pipe.close rescue nil
+                    Process.waitpid pid
+                    raise RuntimeError, "forked process exited with non-zero status." unless $?.to_i.zero?
+                  end
+                  expect( after ).not_to eq before
+                  expect( after ).to eq unshared
+                }
+              end
             end
-          end
 
-          unless others.empty?
-            it "keeps #{others.inspect} namespaces" do
-              others.each{ |ns|
-                before = File.readlink "/proc/self/ns/#{ns}"
-                unshared = nil
-                after = nil
-                begin
-                  pid, (unshared_pid, unshared), pipe = namespaces[ns][:unshare].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
-                  after = namespaces[ns][:func].call lambda{ HrrRbLxns.setns flags, unshared_pid }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
-                ensure
-                  pipe.close rescue nil
-                  Process.waitpid pid
-                  raise RuntimeError, "forked process exited with non-zero status." unless $?.to_i.zero?
-                end
-                expect( after ).to eq before
-                expect( after ).to eq unshared
-              }
+            unless others.empty?
+              it "keeps #{others.inspect} namespaces" do
+                others.each{ |ns|
+                  before = File.readlink "/proc/self/ns/#{ns}"
+                  unshared = nil
+                  after = nil
+                  begin
+                    pid, (unshared_pid, unshared), pipe = namespaces[ns][:unshare].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                    after = namespaces[ns][:func].call lambda{ HrrRbLxns.setns flags, unshared_pid }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                  ensure
+                    pipe.close rescue nil
+                    Process.waitpid pid
+                    raise RuntimeError, "forked process exited with non-zero status." unless $?.to_i.zero?
+                  end
+                  expect( after ).to eq before
+                  expect( after ).to eq unshared
+                }
+              end
             end
           end
         end
       end
-    end
 
-    0.upto(namespaces.size) do |n|
-      namespaces.keys.combination(n).each do |c|
-        targets = c
-        others  = namespaces.keys - targets
+      0.upto(namespaces.size) do |n|
+        namespaces.keys.combination(n).each do |c|
+          targets = c
+          others  = namespaces.keys - targets
 
-        flags = targets.inject(0){|fs, t| fs | namespaces[t][:flag]}
+          flags = targets.inject(0){|fs, t| fs | namespaces[t][:flag]}
 
-        context "with (#{targets.inject([]){|fs, t| fs + [namespaces[t][:long]]}.join(" | ")}) flags" do
-          unless targets.empty?
-            it "associates #{targets.inspect} namespaces" do
-              targets.each{ |ns|
-                before = File.readlink "/proc/self/ns/#{ns}"
-                unshared = nil
-                after = nil
-                begin
-                  pid, (unshared_pid, unshared), pipe = namespaces[ns][:unshare].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
-                  after = namespaces[ns][:func].call lambda{ HrrRbLxns.setns flags, unshared_pid }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
-                ensure
-                  pipe.close rescue nil
-                  Process.waitpid pid
-                  raise RuntimeError, "forked process exited with non-zero status." unless $?.to_i.zero?
-                end
-                expect( after ).not_to eq before
-                expect( after ).to eq unshared
-              }
+          context "with (#{targets.inject([]){|fs, t| fs + [namespaces[t][:long]]}.join(" | ")}) flags" do
+            unless targets.empty?
+              it "associates #{targets.inspect} namespaces" do
+                targets.each{ |ns|
+                  before = File.readlink "/proc/self/ns/#{ns}"
+                  unshared = nil
+                  after = nil
+                  begin
+                    pid, (unshared_pid, unshared), pipe = namespaces[ns][:unshare].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                    after = namespaces[ns][:func].call lambda{ HrrRbLxns.setns flags, unshared_pid }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                  ensure
+                    pipe.close rescue nil
+                    Process.waitpid pid
+                    raise RuntimeError, "forked process exited with non-zero status." unless $?.to_i.zero?
+                  end
+                  expect( after ).not_to eq before
+                  expect( after ).to eq unshared
+                }
+              end
             end
-          end
 
-          unless others.empty?
-            it "keeps #{others.inspect} namespaces" do
-              others.each{ |ns|
-                before = File.readlink "/proc/self/ns/#{ns}"
-                unshared = nil
-                after = nil
-                begin
-                  pid, (unshared_pid, unshared), pipe = namespaces[ns][:unshare].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
-                  after = namespaces[ns][:func].call lambda{ HrrRbLxns.setns flags, unshared_pid }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
-                ensure
-                  pipe.close rescue nil
-                  Process.waitpid pid
-                  raise RuntimeError, "forked process exited with non-zero status." unless $?.to_i.zero?
-                end
-                expect( after ).to eq before
-                expect( after ).to eq unshared
-              }
+            unless others.empty?
+              it "keeps #{others.inspect} namespaces" do
+                others.each{ |ns|
+                  before = File.readlink "/proc/self/ns/#{ns}"
+                  unshared = nil
+                  after = nil
+                  begin
+                    pid, (unshared_pid, unshared), pipe = namespaces[ns][:unshare].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                    after = namespaces[ns][:func].call lambda{ HrrRbLxns.setns flags, unshared_pid }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                  ensure
+                    pipe.close rescue nil
+                    Process.waitpid pid
+                    raise RuntimeError, "forked process exited with non-zero status." unless $?.to_i.zero?
+                  end
+                  expect( after ).to eq before
+                  expect( after ).to eq unshared
+                }
+              end
             end
           end
         end
