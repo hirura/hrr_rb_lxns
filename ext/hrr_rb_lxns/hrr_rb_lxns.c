@@ -56,7 +56,7 @@ hrr_rb_lxns_unshare(VALUE self, VALUE flags)
  * @param fd [Integer] The file descriptor number to associate.
  * @param nstype [Integer] Represents the namespace to associate.
  * @return [Integer] 0.
- * @raise [TypeError] In case the given fd cannot be converted to integer  or the given nstype cannot be converted to integer.
+ * @raise [TypeError] In case the given fd cannot be converted to integer or the given nstype cannot be converted to integer.
  * @raise [Errno::EXXX] In case setns(2) system call failed.
  */
 VALUE
