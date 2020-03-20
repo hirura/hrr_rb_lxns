@@ -65,6 +65,20 @@ HrrRbLxns.setns HrrRbLxns::NEWUTS, pid # => 0
 File.readlink "/proc/self/ns/uts"      # => uts:[yyy]
 ```
 
+## Note
+
+Some of the namespace operations are not multi-thread friendly. The library expects that only main thread is running before unshare or setns operation.
+
+In particular, note that there are some limitations on the use of the library with Ruby version 2.5.x or earlier. This is because of the background timer thread of Ruby.
+
+- Unshare user namespace (with NEWUSER flag) on Ruby 2.5.x or earlier fails.
+- Unshare pid namespace (with NEWPID flag) then Kernel.#fork on Ruby 2.5.x or earlier gets a timer thread related warning.
+- Unshare pid namespace (with NEWPID flag) then Kernel.#fork on Ruby 2.2.x or earlier fails.
+- Setns user namespace (with NEWUSER flag) on Ruby 2.5.x or earlier fails.
+- Setns pid namespace (with NEWPID flag) then Kernel.#fork on Ruby 2.5.x or earlier gets a timer thread related warning.
+- Setns pid namespace (with NEWPID flag) then Kernel.#fork on Ruby 2.2.x or earlier fails.
+- Setns mount namespace (with NEWNS flag) on Ruby 2.5.x or earlier fails.
+
 ## Development
 
 After checking out the repo, run `bin/setup` to install dependencies. Then, run `rake spec` to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
