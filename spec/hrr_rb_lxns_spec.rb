@@ -96,7 +96,9 @@ RSpec.describe HrrRbLxns do
 
           context "with #{flags.inspect} flags" do
             unless targets.empty?
-              if (Gem.ruby_version < Gem::Version.create("2.6")) && targets.include?("user")
+              if (Gem.ruby_version < Gem::Version.create("2.3")) && targets.include?("pid")
+                # Do nothing because unshare with NEWPID flag fails
+              elsif (Gem.ruby_version < Gem::Version.create("2.6")) && targets.include?("user")
                 it "raises SystemCallError" do
                   expect{ HrrRbLxns.unshare flags }.to raise_error SystemCallError
                 end
@@ -112,7 +114,11 @@ RSpec.describe HrrRbLxns do
             end
 
             unless others.empty?
-              unless (Gem.ruby_version < Gem::Version.create("2.6")) && targets.include?("user")
+              if (Gem.ruby_version < Gem::Version.create("2.3")) && targets.include?("pid")
+                # Do nothing because unshare with NEWPID flag fails
+              elsif (Gem.ruby_version < Gem::Version.create("2.6")) && targets.include?("user")
+                # Do nothing because unshare with NEWUSER flag fails
+              else
                 it "keeps #{others.inspect} namespaces" do
                   others.each{ |ns|
                     before = File.readlink "/proc/self/ns/#{ns}"
@@ -135,7 +141,9 @@ RSpec.describe HrrRbLxns do
 
           context "with (#{targets.inject([]){|fs, t| fs + [namespaces[t][:long]]}.join(" | ")}) flags" do
             unless targets.empty?
-              if (Gem.ruby_version < Gem::Version.create("2.6")) && targets.include?("user")
+              if (Gem.ruby_version < Gem::Version.create("2.3")) && targets.include?("pid")
+                # Do nothing because unshare with NEWPID flag fails
+              elsif (Gem.ruby_version < Gem::Version.create("2.6")) && targets.include?("user")
                 it "raises SystemCallError" do
                   expect{ HrrRbLxns.unshare flags }.to raise_error SystemCallError
                 end
@@ -151,7 +159,11 @@ RSpec.describe HrrRbLxns do
             end
 
             unless others.empty?
-              unless (Gem.ruby_version < Gem::Version.create("2.6")) && targets.include?("user")
+              if (Gem.ruby_version < Gem::Version.create("2.3")) && targets.include?("pid")
+                # Do nothing because unshare with NEWPID flag fails
+              elsif (Gem.ruby_version < Gem::Version.create("2.6")) && targets.include?("user")
+                # Do nothing because unshare with NEWUSER flag fails
+              else
                 it "keeps #{others.inspect} namespaces" do
                   others.each{ |ns|
                     before = File.readlink "/proc/self/ns/#{ns}"
@@ -192,64 +204,68 @@ RSpec.describe HrrRbLxns do
 
           context "with #{flags.inspect} flags" do
             unless targets.empty?
-              if (Gem.ruby_version < Gem::Version.create("2.6"))
-                if targets.include?("user")
-                  # Do nothing because unshare with NEWUSER flag fails
-                elsif targets.include?("mnt")
-                  it "raises SystemCallError" do
-                    targets.each{ |ns|
-                      begin
-                        pid_to_wait, (pid_target, target), pipe = namespaces[ns][:func2].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
-                        expect{ HrrRbLxns.setns flags, pid_target }.to raise_error SystemCallError
-                      ensure
-                        pipe.close rescue nil
-                        Process.waitpid pid_to_wait
-                        raise RuntimeError, "forked process exited with non-zero status." unless $?.to_i.zero?
-                      end
-                    }
-                  end
-                else
-                  it "associates #{targets.inspect} namespaces" do
-                    targets.each{ |ns|
-                      before = File.readlink "/proc/self/ns/#{ns}"
-                      target = nil
-                      after = nil
-                      begin
-                        pid_to_wait, (pid_target, target), pipe = namespaces[ns][:func2].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
-                        after = namespaces[ns][:func1].call lambda{ HrrRbLxns.setns flags, pid_target }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
-                      ensure
-                        pipe.close rescue nil
-                        Process.waitpid pid_to_wait
-                        raise RuntimeError, "forked process exited with non-zero status." unless $?.to_i.zero?
-                      end
-                      expect( after ).not_to eq before
-                      expect( after ).to eq target
-                    }
-                  end
+              if (Gem.ruby_version < Gem::Version.create("2.3")) && targets.include?("pid")
+                # Do nothing because unshare with NEWPID flag fails
+              elsif (Gem.ruby_version < Gem::Version.create("2.6")) && targets.include?("user")
+                # Do nothing because unshare with NEWUSER flag fails
+              elsif (Gem.ruby_version < Gem::Version.create("2.6")) && targets.include?("mnt")
+                it "raises SystemCallError" do
+                  targets.each{ |ns|
+                    begin
+                      pid_to_wait, (pid_target, target), pipe = namespaces[ns][:func2].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                      expect{ HrrRbLxns.setns flags, pid_target }.to raise_error SystemCallError
+                    ensure
+                      pipe.close rescue nil
+                      Process.waitpid pid_to_wait
+                      raise RuntimeError, "forked process exited with non-zero status." unless $?.to_i.zero?
+                    end
+                  }
+                end
+              else
+                it "associates #{targets.inspect} namespaces" do
+                  targets.each{ |ns|
+                    before = File.readlink "/proc/self/ns/#{ns}"
+                    target = nil
+                    after = nil
+                    begin
+                      pid_to_wait, (pid_target, target), pipe = namespaces[ns][:func2].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                      after = namespaces[ns][:func1].call lambda{ HrrRbLxns.setns flags, pid_target }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                    ensure
+                      pipe.close rescue nil
+                      Process.waitpid pid_to_wait
+                      raise RuntimeError, "forked process exited with non-zero status." unless $?.to_i.zero?
+                    end
+                    expect( after ).not_to eq before
+                    expect( after ).to eq target
+                  }
                 end
               end
             end
 
             unless others.empty?
-              if (Gem.ruby_version < Gem::Version.create("2.6"))
-                unless targets.include?("user") || targets.include?("mnt")
-                  it "keeps #{others.inspect} namespaces" do
-                    others.each{ |ns|
-                      before = File.readlink "/proc/self/ns/#{ns}"
-                      target = nil
-                      after = nil
-                      begin
-                        pid_to_wait, (pid_target, target), pipe = namespaces[ns][:func2].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
-                        after = namespaces[ns][:func1].call lambda{ HrrRbLxns.setns flags, pid_target }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
-                      ensure
-                        pipe.close rescue nil
-                        Process.waitpid pid_to_wait
-                        raise RuntimeError, "forked process exited with non-zero status." unless $?.to_i.zero?
-                      end
-                      expect( after ).to eq before
-                      expect( after ).to eq target
-                    }
-                  end
+              if (Gem.ruby_version < Gem::Version.create("2.3")) && targets.include?("pid")
+                # Do nothing because unshare with NEWPID flag fails
+              elsif (Gem.ruby_version < Gem::Version.create("2.6")) && targets.include?("user")
+                # Do nothing because unshare with NEWUSER flag fails
+              elsif (Gem.ruby_version < Gem::Version.create("2.6")) && targets.include?("mnt")
+                # Do nothing because unshare with NEWUSER flag fails
+              else
+                it "keeps #{others.inspect} namespaces" do
+                  others.each{ |ns|
+                    before = File.readlink "/proc/self/ns/#{ns}"
+                    target = nil
+                    after = nil
+                    begin
+                      pid_to_wait, (pid_target, target), pipe = namespaces[ns][:func2].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                      after = namespaces[ns][:func1].call lambda{ HrrRbLxns.setns flags, pid_target }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                    ensure
+                      pipe.close rescue nil
+                      Process.waitpid pid_to_wait
+                      raise RuntimeError, "forked process exited with non-zero status." unless $?.to_i.zero?
+                    end
+                    expect( after ).to eq before
+                    expect( after ).to eq target
+                  }
                 end
               end
             end
@@ -266,64 +282,68 @@ RSpec.describe HrrRbLxns do
 
           context "with (#{targets.inject([]){|fs, t| fs + [namespaces[t][:long]]}.join(" | ")}) flags" do
             unless targets.empty?
-              if (Gem.ruby_version < Gem::Version.create("2.6"))
-                if targets.include?("user")
-                  # Do nothing because unshare with NEWUSER flag fails
-                elsif targets.include?("mnt")
-                  it "raises SystemCallError" do
-                    targets.each{ |ns|
-                      begin
-                        pid_to_wait, (pid_target, target), pipe = namespaces[ns][:func2].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
-                        expect{ HrrRbLxns.setns flags, pid_target }.to raise_error SystemCallError
-                      ensure
-                        pipe.close rescue nil
-                        Process.waitpid pid_to_wait
-                        raise RuntimeError, "forked process exited with non-zero status." unless $?.to_i.zero?
-                      end
-                    }
-                  end
-                else
-                  it "associates #{targets.inspect} namespaces" do
-                    targets.each{ |ns|
-                      before = File.readlink "/proc/self/ns/#{ns}"
-                      target = nil
-                      after = nil
-                      begin
-                        pid_to_wait, (pid_target, target), pipe = namespaces[ns][:func2].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
-                        after = namespaces[ns][:func1].call lambda{ HrrRbLxns.setns flags, pid_target }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
-                      ensure
-                        pipe.close rescue nil
-                        Process.waitpid pid_to_wait
-                        raise RuntimeError, "forked process exited with non-zero status." unless $?.to_i.zero?
-                      end
-                      expect( after ).not_to eq before
-                      expect( after ).to eq target
-                    }
-                  end
+              if (Gem.ruby_version < Gem::Version.create("2.3")) && targets.include?("pid")
+                # Do nothing because unshare with NEWPID flag fails
+              elsif (Gem.ruby_version < Gem::Version.create("2.6")) && targets.include?("user")
+                # Do nothing because unshare with NEWUSER flag fails
+              elsif (Gem.ruby_version < Gem::Version.create("2.6")) && targets.include?("mnt")
+                it "raises SystemCallError" do
+                  targets.each{ |ns|
+                    begin
+                      pid_to_wait, (pid_target, target), pipe = namespaces[ns][:func2].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                      expect{ HrrRbLxns.setns flags, pid_target }.to raise_error SystemCallError
+                    ensure
+                      pipe.close rescue nil
+                      Process.waitpid pid_to_wait
+                      raise RuntimeError, "forked process exited with non-zero status." unless $?.to_i.zero?
+                    end
+                  }
+                end
+              else
+                it "associates #{targets.inspect} namespaces" do
+                  targets.each{ |ns|
+                    before = File.readlink "/proc/self/ns/#{ns}"
+                    target = nil
+                    after = nil
+                    begin
+                      pid_to_wait, (pid_target, target), pipe = namespaces[ns][:func2].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                      after = namespaces[ns][:func1].call lambda{ HrrRbLxns.setns flags, pid_target }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                    ensure
+                      pipe.close rescue nil
+                      Process.waitpid pid_to_wait
+                      raise RuntimeError, "forked process exited with non-zero status." unless $?.to_i.zero?
+                    end
+                    expect( after ).not_to eq before
+                    expect( after ).to eq target
+                  }
                 end
               end
             end
 
             unless others.empty?
-              if (Gem.ruby_version < Gem::Version.create("2.6"))
-                unless targets.include?("user") || targets.include?("mnt")
-                  it "keeps #{others.inspect} namespaces" do
-                    others.each{ |ns|
-                      before = File.readlink "/proc/self/ns/#{ns}"
-                      target = nil
-                      after = nil
-                      begin
-                        pid_to_wait, (pid_target, target), pipe = namespaces[ns][:func2].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
-                        after = namespaces[ns][:func1].call lambda{ HrrRbLxns.setns flags, pid_target }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
-                      ensure
-                        pipe.close rescue nil
-                        Process.waitpid pid_to_wait
-                        raise RuntimeError, "forked process exited with non-zero status." unless $?.to_i.zero?
-                      end
-                      expect( after ).to eq before
-                      expect( after ).to eq target
-                    }
-                  end
+              if (Gem.ruby_version < Gem::Version.create("2.3")) && targets.include?("pid")
+                # Do nothing because unshare with NEWPID flag fails
+              elsif (Gem.ruby_version < Gem::Version.create("2.6")) && targets.include?("user")
+                # Do nothing because unshare with NEWUSER flag fails
+              elsif (Gem.ruby_version < Gem::Version.create("2.6")) && targets.include?("mnt")
+                # Do nothing because unshare with NEWUSER flag fails
+              else
+                it "keeps #{others.inspect} namespaces" do
+                  others.each{ |ns|
+                    before = File.readlink "/proc/self/ns/#{ns}"
+                    target = nil
+                    after = nil
+                    begin
+                      pid_to_wait, (pid_target, target), pipe = namespaces[ns][:func2].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                      after = namespaces[ns][:func1].call lambda{ HrrRbLxns.setns flags, pid_target }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                    ensure
+                      pipe.close rescue nil
+                      Process.waitpid pid_to_wait
+                      raise RuntimeError, "forked process exited with non-zero status." unless $?.to_i.zero?
+                    end
+                    expect( after ).to eq before
+                    expect( after ).to eq target
+                  }
                 end
               end
             end
