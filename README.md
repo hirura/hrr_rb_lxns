@@ -1,5 +1,8 @@
 # HrrRbLxns
 
+[![Build Status](https://travis-ci.com/hirura/hrr_rb_lxns.svg?branch=master)](https://travis-ci.com/hirura/hrr_rb_lxns)
+[![Gem Version](https://badge.fury.io/rb/hrr_rb_lxns.svg)](https://badge.fury.io/rb/hrr_rb_lxns)
+
 hrr_rb_lxns implements utilities working with Linux namespaces for CRuby.
 
 ## Installation
