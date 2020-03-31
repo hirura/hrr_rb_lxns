@@ -91,15 +91,8 @@ module HrrRbLxns
   # @raise [Errno::EXXX] In case setns(2) system call failed.
   def self.setns flags, pid, options={}
     _flags = interpret_flags flags
-    files = get_files _flags, pid, options
-    files.each do |path, nstype|
-      begin
-        file = File.open(path, File::RDONLY)
-        __setns__ file.fileno, nstype
-      ensure
-        file.close rescue nil
-      end
-    end
+    nstype_file_h = get_nstype_file_h _flags, pid, options
+    do_setns nstype_file_h
   end
 
   private
@@ -127,7 +120,15 @@ module HrrRbLxns
     end
   end
 
-  def self.get_files flags, pid, options
+  def self.do_setns nstype_file_h
+    nstype_file_h.each do |nstype, file|
+      File.open(file, File::RDONLY) do |f|
+        __setns__ f.fileno, nstype
+      end
+    end
+  end
+
+  def self.get_nstype_file_h flags, pid, options
     list = Array.new
     list.push ["ipc",    NEWIPC,    :ipc    ] if const_defined?(:NEWIPC)
     list.push ["mnt",    NEWNS,     :mount  ] if const_defined?(:NEWNS)
@@ -137,12 +138,12 @@ module HrrRbLxns
     list.push ["user",   NEWUSER,   :user   ] if const_defined?(:NEWUSER)
     list.push ["cgroup", NEWCGROUP, :cgroup ] if const_defined?(:NEWCGROUP)
     list.push ["time",   NEWTIME,   :time   ] if const_defined?(:NEWTIME)
-    files = Array.new
+    nstype_file_h = Hash.new
     list.each do |name, flag, key|
       file = get_file name, (flags & flag), pid, key, options[key]
-      files.push [file, flag] if file
+      nstype_file_h[flag] = file if file
     end
-    files
+    nstype_file_h
   end
 
   def self.get_file name, flag, pid, key, option
