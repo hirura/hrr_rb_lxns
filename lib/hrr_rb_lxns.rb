@@ -77,7 +77,7 @@ module HrrRbLxns
   #   /proc/pid/ns/user :   user namespace <br>
   #   /proc/pid/ns/cgroup : cgroup namespace <br>
   #   /proc/pid/ns/time :   time namespace <br>
-  # @param options [Hash]
+  # @param options [Hash] Optional arguments.
   # @option options [String] :mount A file which specifies the mount namespace to associate with.
   # @option options [String] :uts A file which specifies the uts namespace to associate with.
   # @option options [String] :ipc A file which specifies the ipc namespace to associate with.
