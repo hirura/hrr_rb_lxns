@@ -76,14 +76,14 @@ RSpec.describe HrrRbLxns do
   }
 
   namespaces = Hash.new
-  namespaces["mnt"]    = {short: "m", long: "NEWNS",     flag: HrrRbLxns::NEWNS,     func1: fork_yld1_yld2,      func2: fork_yld1_yld2_wait     } if HrrRbLxns.const_defined? :NEWNS
-  namespaces["uts"]    = {short: "u", long: "NEWUTS",    flag: HrrRbLxns::NEWUTS,    func1: fork_yld1_yld2,      func2: fork_yld1_yld2_wait     } if HrrRbLxns.const_defined? :NEWUTS
-  namespaces["ipc"]    = {short: "i", long: "NEWIPC",    flag: HrrRbLxns::NEWIPC,    func1: fork_yld1_yld2,      func2: fork_yld1_yld2_wait     } if HrrRbLxns.const_defined? :NEWIPC
-  namespaces["net"]    = {short: "n", long: "NEWNET",    flag: HrrRbLxns::NEWNET,    func1: fork_yld1_yld2,      func2: fork_yld1_yld2_wait     } if HrrRbLxns.const_defined? :NEWNET
-  namespaces["pid"]    = {short: "p", long: "NEWPID",    flag: HrrRbLxns::NEWPID,    func1: fork_yld1_fork_yld2, func2: fork_yld1_fork_yld2_wait} if HrrRbLxns.const_defined? :NEWPID
-  namespaces["user"]   = {short: "U", long: "NEWUSER",   flag: HrrRbLxns::NEWUSER,   func1: fork_yld1_yld2,      func2: fork_yld1_yld2_wait     } if HrrRbLxns.const_defined? :NEWUSER
-  namespaces["cgroup"] = {short: "C", long: "NEWCGROUP", flag: HrrRbLxns::NEWCGROUP, func1: fork_yld1_yld2,      func2: fork_yld1_yld2_wait     } if HrrRbLxns.const_defined? :NEWCGROUP
-  namespaces["time"]   = {short: "T", long: "NEWTIME",   flag: HrrRbLxns::NEWTIME,   func1: fork_yld1_yld2,      func2: fork_yld1_yld2_wait     } if HrrRbLxns.const_defined? :NEWTIME
+  namespaces["mnt"]    = {short: "m", long: "NEWNS",     flag: HrrRbLxns::NEWNS,     key: :mount,   func1: fork_yld1_yld2,      func2: fork_yld1_yld2_wait     } if HrrRbLxns.const_defined? :NEWNS
+  namespaces["uts"]    = {short: "u", long: "NEWUTS",    flag: HrrRbLxns::NEWUTS,    key: :uts,     func1: fork_yld1_yld2,      func2: fork_yld1_yld2_wait     } if HrrRbLxns.const_defined? :NEWUTS
+  namespaces["ipc"]    = {short: "i", long: "NEWIPC",    flag: HrrRbLxns::NEWIPC,    key: :ipc,     func1: fork_yld1_yld2,      func2: fork_yld1_yld2_wait     } if HrrRbLxns.const_defined? :NEWIPC
+  namespaces["net"]    = {short: "n", long: "NEWNET",    flag: HrrRbLxns::NEWNET,    key: :network, func1: fork_yld1_yld2,      func2: fork_yld1_yld2_wait     } if HrrRbLxns.const_defined? :NEWNET
+  namespaces["pid"]    = {short: "p", long: "NEWPID",    flag: HrrRbLxns::NEWPID,    key: :pid,     func1: fork_yld1_fork_yld2, func2: fork_yld1_fork_yld2_wait} if HrrRbLxns.const_defined? :NEWPID
+  namespaces["user"]   = {short: "U", long: "NEWUSER",   flag: HrrRbLxns::NEWUSER,   key: :user,    func1: fork_yld1_yld2,      func2: fork_yld1_yld2_wait     } if HrrRbLxns.const_defined? :NEWUSER
+  namespaces["cgroup"] = {short: "C", long: "NEWCGROUP", flag: HrrRbLxns::NEWCGROUP, key: :cgroup,  func1: fork_yld1_yld2,      func2: fork_yld1_yld2_wait     } if HrrRbLxns.const_defined? :NEWCGROUP
+  namespaces["time"]   = {short: "T", long: "NEWTIME",   flag: HrrRbLxns::NEWTIME,   key: :time,    func1: fork_yld1_yld2,      func2: fork_yld1_yld2_wait     } if HrrRbLxns.const_defined? :NEWTIME
 
   describe ".unshare" do
     context "with no options" do
@@ -344,6 +344,181 @@ RSpec.describe HrrRbLxns do
                     expect( after ).to eq before
                     expect( after ).to eq target
                   }
+                end
+              end
+            end
+          end
+        end
+      end
+    end
+
+    context "with options" do
+      context "with namespace file specified" do
+        persist_files = {
+                          "mnt"    => "mount ns file",
+                          "uts"    => "uts ns file",
+                          "ipc"    => "ipc ns file",
+                          "net"    => "network ns file",
+                          "pid"    => "pid ns file",
+                          "user"   => "user ns file",
+                          "cgroup" => "cgroup ns file",
+                          "time"   => "time ns file",
+                        }
+
+        context "with pid" do
+          pid = Process.pid
+          pid_ns_files = {
+                           "mnt"    => "/proc/#{pid}/ns/mnt",
+                           "uts"    => "/proc/#{pid}/ns/uts",
+                           "ipc"    => "/proc/#{pid}/ns/ipc",
+                           "net"    => "/proc/#{pid}/ns/net",
+                           "pid"    => "/proc/#{pid}/ns/pid",
+                           "user"   => "/proc/#{pid}/ns/user",
+                           "cgroup" => "/proc/#{pid}/ns/cgroup",
+                           "time"   => "/proc/#{pid}/ns/time",
+                         }
+
+          0.upto(namespaces.size) do |n|
+            namespaces.keys.combination(n).each do |c|
+              targets = c
+
+              flags = targets.inject(""){|fs, t| fs + namespaces[t][:short]}
+
+              0.upto(n) do |m|
+                targets.combination(m).each do |cc|
+                  options_targets = cc
+
+                  options = Hash.new
+                  options_targets.each do |key|
+                    options[namespaces[key][:key]] = persist_files[key]
+                  end
+
+                  arg = Hash.new
+                  options_targets.each do |key|
+                    arg[namespaces[key][:flag]] = persist_files[key]
+                  end
+                  (targets - options_targets).each do |key|
+                    arg[namespaces[key][:flag]] = pid_ns_files[key]
+                  end
+
+                  context "with #{flags.inspect} flags and #{options} options" do
+                    it "associates #{(targets - options_targets).inspect} namespaces specified by pid and #{options_targets.inspect} namespaces specified by files" do
+                      expect(HrrRbLxns).to receive(:do_setns).with(arg).once
+                      HrrRbLxns.setns flags, pid, options
+                    end
+                  end
+                end
+              end
+            end
+          end
+
+          0.upto(namespaces.size) do |n|
+            namespaces.keys.combination(n).each do |c|
+              targets = c
+
+              flags = targets.inject(0){|fs, t| fs | namespaces[t][:flag]}
+
+              0.upto(n) do |m|
+                targets.combination(m).each do |cc|
+                  options_targets = cc
+
+                  options = Hash.new
+                  options_targets.each do |key|
+                    options[namespaces[key][:key]] = persist_files[key]
+                  end
+
+                  arg = Hash.new
+                  options_targets.each do |key|
+                    arg[namespaces[key][:flag]] = persist_files[key]
+                  end
+                  (targets - options_targets).each do |key|
+                    arg[namespaces[key][:flag]] = pid_ns_files[key]
+                  end
+
+                  context "with (#{targets.inject([]){|fs, t| fs + [namespaces[t][:long]]}.join(" | ")}) flags and #{options} options" do
+                    it "associates #{(targets - options_targets).inspect} namespaces specified by pid and #{options_targets.inspect} namespaces specified by files" do
+                      expect(HrrRbLxns).to receive(:do_setns).with(arg).once
+                      HrrRbLxns.setns flags, pid, options
+                    end
+                  end
+                end
+              end
+            end
+          end
+        end
+
+        context "with no pid" do
+          pid = nil
+
+          0.upto(namespaces.size) do |n|
+            namespaces.keys.combination(n).each do |c|
+              targets = c
+
+              flags = targets.inject(""){|fs, t| fs + namespaces[t][:short]}
+
+              0.upto(n) do |m|
+                targets.combination(m).each do |cc|
+                  options_targets = cc
+
+                  options = Hash.new
+                  options_targets.each do |key|
+                    options[namespaces[key][:key]] = persist_files[key]
+                  end
+
+                  arg = Hash.new
+                  options_targets.each do |key|
+                    arg[namespaces[key][:flag]] = persist_files[key]
+                  end
+
+                  context "with #{flags.inspect} flags and #{options} options" do
+                    if (targets - options_targets).empty?
+                      it "associates #{options_targets.inspect} namespaces specified by files" do
+                        expect(HrrRbLxns).to receive(:do_setns).with(arg).once
+                        HrrRbLxns.setns flags, pid, options
+                      end
+                    else
+                      it "raises ArgumentError" do
+                        expect{ HrrRbLxns.setns flags, pid, options }.to raise_error ArgumentError
+                      end
+                    end
+                  end
+                end
+              end
+            end
+          end
+
+          0.upto(namespaces.size) do |n|
+            namespaces.keys.combination(n).each do |c|
+              targets = c
+
+              flags = targets.inject(""){|fs, t| fs + namespaces[t][:short]}
+
+              0.upto(n) do |m|
+                targets.combination(m).each do |cc|
+                  options_targets = cc
+
+                  options = Hash.new
+                  options_targets.each do |key|
+                    options[namespaces[key][:key]] = persist_files[key]
+                  end
+
+                  arg = Hash.new
+                  options_targets.each do |key|
+                    arg[namespaces[key][:flag]] = persist_files[key]
+                  end
+
+                  context "with (#{targets.inject([]){|fs, t| fs + [namespaces[t][:long]]}.join(" | ")}) flags and #{options} options" do
+                    if (targets - options_targets).empty?
+                      it "associates #{options_targets.inspect} namespaces specified by files" do
+                        expect(HrrRbLxns).to receive(:do_setns).with(arg).once
+                        HrrRbLxns.setns flags, pid, options
+                      end
+                    else
+                      it "raises ArgumentError" do
+                        expect{ HrrRbLxns.setns flags, pid, options }.to raise_error ArgumentError
+                      end
+                    end
+                  end
                 end
               end
             end
