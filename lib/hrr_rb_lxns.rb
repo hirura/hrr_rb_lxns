@@ -78,14 +78,14 @@ module HrrRbLxns
   #   /proc/pid/ns/cgroup : cgroup namespace <br>
   #   /proc/pid/ns/time :   time namespace <br>
   # @param options [Hash] Optional arguments.
-  # @option options [String] :mount A file which specifies the mount namespace to associate with.
-  # @option options [String] :uts A file which specifies the uts namespace to associate with.
-  # @option options [String] :ipc A file which specifies the ipc namespace to associate with.
+  # @option options [String] :mount   A file which specifies the mount namespace to associate with.
+  # @option options [String] :uts     A file which specifies the uts namespace to associate with.
+  # @option options [String] :ipc     A file which specifies the ipc namespace to associate with.
   # @option options [String] :network A file which specifies the network namespace to associate with.
-  # @option options [String] :pid A file which specifies the pid namespace to associate with.
-  # @option options [String] :user A file which specifies the user namespace to associate with.
-  # @option options [String] :cgroup A file which specifies the cgroup namespace to associate with.
-  # @option options [String] :time A file which specifies the time namespace to associate with.
+  # @option options [String] :pid     A file which specifies the pid namespace to associate with.
+  # @option options [String] :user    A file which specifies the user namespace to associate with.
+  # @option options [String] :cgroup  A file which specifies the cgroup namespace to associate with.
+  # @option options [String] :time    A file which specifies the time namespace to associate with.
   # @return [Integer] 0.
   # @raise [ArgumentError] When given flags argument is not appropriate or when given pid and/or options are not appropriate for the given flags.
   # @raise [Errno::EXXX] In case setns(2) system call failed.
