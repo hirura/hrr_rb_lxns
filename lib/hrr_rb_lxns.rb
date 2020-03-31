@@ -58,7 +58,7 @@ module HrrRbLxns
   #   HrrRbLxns.setns HrrRbLxns::NEWUTS, pid # => 0
   #   File.readlink "/proc/self/ns/uts"      # => uts:[yyy]
   #
-  # @param flags [Integer] An integer value that represents namespaces to disassociate.
+  # @param flags [Integer] An integer value that represents namespaces to associate.
   # @param flags [String] A string that represents namespaces. The mapping of charactors and flags are: <br>
   #   "i" : NEWIPC <br>
   #   "m" : NEWNS <br>
