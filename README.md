@@ -68,6 +68,15 @@ HrrRbLxns.setns HrrRbLxns::NEWUTS, pid # => 0
 File.readlink "/proc/self/ns/uts"      # => uts:[yyy]
 ```
 
+HrrRbLxns.setns can associate namespaces using files which specify namespaces, instead of specifying pid. The files are specified in an options hash. The keys which are available in the hash for each namespace are `:mount`, `:uts`, `:ipc`, `:network`, `:pid`, `:user`, `:cgroup`, and `:time`.
+
+```ruby
+# Create a network namespace using the ip netns command. The command generates "/run/netns/ns0" file, which is a bind-mounted namespace file.
+system "ip netns add ns0"
+# Then associate with the network namespace with specifying the file instead of pid.
+HrrRbLxns.setns HrrRbLxns::NETNET, nil, {network: "/run/netns/ns0"}
+```
+
 ## Note
 
 Some of the namespace operations are not multi-thread friendly. The library expects that only main thread is running before unshare or setns operation.
