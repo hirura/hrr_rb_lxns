@@ -1,5 +1,6 @@
 require "hrr_rb_lxns/version"
 require "hrr_rb_lxns/hrr_rb_lxns"
+require "hrr_rb_mount"
 
 # Utilities working with Linux namespaces for CRuby.
 module HrrRbLxns
@@ -33,14 +34,23 @@ module HrrRbLxns
   #   "U" : NEWUSER <br>
   #   "C" : NEWCGROUP <br>
   #   "T" : NEWTIME <br>
-  # @param options [Hash] For future use.
+  # @param options [Hash] Optional arguments.
+  # @option options [String] :mount   A persistent mount namespace to be created by bind mount.
+  # @option options [String] :uts     A persistent uts namespace to be created by bind mount.
+  # @option options [String] :ipc     A persistent ipc namespace to be created by bind mount.
+  # @option options [String] :network A persistent network namespace to be created by bind mount.
+  # @option options [String] :pid     A persistent pid namespace to be created by bind mount.
+  # @option options [String] :user    A persistent user namespace to be created by bind mount.
+  # @option options [String] :cgroup  A persistent cgroup namespace to be created by bind mount.
+  # @option options [String] :time    A persistent time namespace to be created by bind mount.
   # @return [Integer] 0.
   # @raise [ArgumentError] When given flags argument is not appropriate.
   # @raise [Errno::EXXX] In case unshare(2) system call failed.
-
   def self.unshare flags, options={}
     _flags = interpret_flags flags
-    __unshare__ _flags
+    ret = __unshare__ _flags
+    bind_ns_files _flags, options
+    ret
   end
 
   # A wrapper around setns(2) system call.
@@ -116,6 +126,24 @@ module HrrRbLxns
       elsif c == "C" && const_defined?(:NEWCGROUP) then f | NEWCGROUP
       elsif c == "T" && const_defined?(:NEWTIME)   then f | NEWTIME
       else raise ArgumentError, "unsupported flag charactor: #{c.inspect}"
+      end
+    end
+  end
+
+  def self.bind_ns_files flags, options
+    list = Array.new
+    list.push ["ipc",    NEWIPC,    :ipc    ] if const_defined?(:NEWIPC)
+    list.push ["mnt",    NEWNS,     :mount  ] if const_defined?(:NEWNS)
+    list.push ["net",    NEWNET,    :network] if const_defined?(:NEWNET)
+    list.push ["pid",    NEWPID,    :pid    ] if const_defined?(:NEWPID)
+    list.push ["uts",    NEWUTS,    :uts    ] if const_defined?(:NEWUTS)
+    list.push ["user",   NEWUSER,   :user   ] if const_defined?(:NEWUSER)
+    list.push ["cgroup", NEWCGROUP, :cgroup ] if const_defined?(:NEWCGROUP)
+    list.push ["time",   NEWTIME,   :time   ] if const_defined?(:NEWTIME)
+    pid = "self"
+    list.each do |name, flag, key|
+      if (flags & flag).zero?.! && options[key]
+        HrrRbMount.bind "/proc/#{pid}/ns/#{name}", options[key]
       end
     end
   end
