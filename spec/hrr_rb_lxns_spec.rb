@@ -243,20 +243,56 @@ RSpec.describe HrrRbLxns do
                     expect{ HrrRbLxns.unshare flags, options }.to raise_error SystemCallError
                   end
                 else
-                  it "disassociates #{targets.inspect} namespaces and bind-mounts them" do
-                    options = Hash.new
-                    targets.each do |key|
-                      options[namespaces[key][:key]] = @persist_files[key].path
+                  if targets.include? "pid"
+                    context "without :fork option" do
+                      it "disassociates #{targets.inspect} namespaces and bind-mounts them except for pid" do
+                        options = Hash.new
+                        targets.each do |key|
+                          options[namespaces[key][:key]] = @persist_files[key].path
+                        end
+                        targets.each{ |ns|
+                          before = File.stat("/proc/self/ns/#{ns}").ino
+                          after = namespaces[ns][:func1].call lambda{ HrrRbLxns.unshare flags, options }, lambda{ File.stat("/proc/self/ns/#{ns}").ino }
+                          expect( after ).not_to eq before
+                          expect( HrrRbMount.mountpoint?(@persist_files[ns].path) ).to be true
+                          if ns == "pid"
+                            expect( File.stat(@persist_files[ns].path).ino ).to_not eq after
+                          else
+                            expect( File.stat(@persist_files[ns].path).ino ).to eq after
+                          end
+                        }
+                      end
                     end
-                    targets.each{ |ns|
-                      before = File.stat("/proc/self/ns/#{ns}").ino
-                      after = namespaces[ns][:func1].call lambda{ HrrRbLxns.unshare flags, options }, lambda{ File.stat("/proc/self/ns/#{ns}").ino }
-                      expect( after ).not_to eq before
-                      if ns != "pid"
+                    context "with :fork option" do
+                      it "disassociates #{targets.inspect} namespaces and bind-mounts them (pid_for_children for pid)" do
+                        options = Hash.new
+                        targets.each do |key|
+                          options[namespaces[key][:key]] = @persist_files[key].path
+                        end
+                        options[:fork] = true
+                        targets.each{ |ns|
+                          before = File.stat("/proc/self/ns/#{ns}").ino
+                          after = namespaces[ns][:func1].call lambda{ HrrRbLxns.unshare flags, options }, lambda{ File.stat("/proc/self/ns/#{ns}").ino }
+                          expect( after ).not_to eq before
+                          expect( HrrRbMount.mountpoint?(@persist_files[ns].path) ).to be true
+                          expect( File.stat(@persist_files[ns].path).ino ).to eq after
+                        }
+                      end
+                    end
+                  else
+                    it "disassociates #{targets.inspect} namespaces and bind-mounts them" do
+                      options = Hash.new
+                      targets.each do |key|
+                        options[namespaces[key][:key]] = @persist_files[key].path
+                      end
+                      targets.each{ |ns|
+                        before = File.stat("/proc/self/ns/#{ns}").ino
+                        after = namespaces[ns][:func1].call lambda{ HrrRbLxns.unshare flags, options }, lambda{ File.stat("/proc/self/ns/#{ns}").ino }
+                        expect( after ).not_to eq before
                         expect( HrrRbMount.mountpoint?(@persist_files[ns].path) ).to be true
                         expect( File.stat(@persist_files[ns].path).ino ).to eq after
-                      end
-                    }
+                      }
+                    end
                   end
                 end
               end
@@ -305,20 +341,56 @@ RSpec.describe HrrRbLxns do
                     expect{ HrrRbLxns.unshare flags, options }.to raise_error SystemCallError
                   end
                 else
-                  it "disassociates #{targets.inspect} namespaces and bind-mounts them" do
-                    options = Hash.new
-                    targets.each do |key|
-                      options[namespaces[key][:key]] = @persist_files[key].path
+                  if targets.include? "pid"
+                    context "without :fork option" do
+                      it "disassociates #{targets.inspect} namespaces and bind-mounts them except for pid" do
+                        options = Hash.new
+                        targets.each do |key|
+                          options[namespaces[key][:key]] = @persist_files[key].path
+                        end
+                        targets.each{ |ns|
+                          before = File.stat("/proc/self/ns/#{ns}").ino
+                          after = namespaces[ns][:func1].call lambda{ HrrRbLxns.unshare flags, options }, lambda{ File.stat("/proc/self/ns/#{ns}").ino }
+                          expect( after ).not_to eq before
+                          expect( HrrRbMount.mountpoint?(@persist_files[ns].path) ).to be true
+                          if ns == "pid"
+                            expect( File.stat(@persist_files[ns].path).ino ).to_not eq after
+                          else
+                            expect( File.stat(@persist_files[ns].path).ino ).to eq after
+                          end
+                        }
+                      end
                     end
-                    targets.each{ |ns|
-                      before = File.stat("/proc/self/ns/#{ns}").ino
-                      after = namespaces[ns][:func1].call lambda{ HrrRbLxns.unshare flags, options }, lambda{ File.stat("/proc/self/ns/#{ns}").ino }
-                      expect( after ).not_to eq before
-                      if ns != "pid"
+                    context "with :fork option" do
+                      it "disassociates #{targets.inspect} namespaces and bind-mounts them (pid_for_children for pid)" do
+                        options = Hash.new
+                        targets.each do |key|
+                          options[namespaces[key][:key]] = @persist_files[key].path
+                        end
+                        options[:fork] = true
+                        targets.each{ |ns|
+                          before = File.stat("/proc/self/ns/#{ns}").ino
+                          after = namespaces[ns][:func1].call lambda{ HrrRbLxns.unshare flags, options }, lambda{ File.stat("/proc/self/ns/#{ns}").ino }
+                          expect( after ).not_to eq before
+                          expect( HrrRbMount.mountpoint?(@persist_files[ns].path) ).to be true
+                          expect( File.stat(@persist_files[ns].path).ino ).to eq after
+                        }
+                      end
+                    end
+                  else
+                    it "disassociates #{targets.inspect} namespaces and bind-mounts them" do
+                      options = Hash.new
+                      targets.each do |key|
+                        options[namespaces[key][:key]] = @persist_files[key].path
+                      end
+                      targets.each{ |ns|
+                        before = File.stat("/proc/self/ns/#{ns}").ino
+                        after = namespaces[ns][:func1].call lambda{ HrrRbLxns.unshare flags, options }, lambda{ File.stat("/proc/self/ns/#{ns}").ino }
+                        expect( after ).not_to eq before
                         expect( HrrRbMount.mountpoint?(@persist_files[ns].path) ).to be true
                         expect( File.stat(@persist_files[ns].path).ino ).to eq after
-                      end
-                    }
+                      }
+                    end
                   end
                 end
               end

@@ -47,6 +47,7 @@ File.readlink "/proc/self/ns/mnt"   # => mnt:[yyy]
 
 HrrRbLxns.unshare supports creating persistent namespaces files by bind-mount. The files are specified in an options hash. The keys which are available in the hash for each namespace are `:mount`, `:uts`, `:ipc`, `:network`, `:pid`, `:user`, `:cgroup`, and `:time`.
 Note that files that namespaces are bind-mounted must exist. The library does just bind-mount, not create the files. And the files and their mount information are kept after the caller process is finished.
+When unsharing pid namespace, the namespace file should be bind-mounted against the caller's child process. For this case, `:fork` option is supported.
 
 ```ruby
 File.readlink "/proc/self/ns/uts"            # => uts:[aaa]
@@ -63,6 +64,18 @@ HrrRbMount.make_private "/path/to/myns"
 FileUtils.touch "/path/to/myns/mnt"
 options = {:mount => "/path/to/myns/mnt"}
 HrrRbLxns.unshare HrrRbLxns::NEWNS, options # => 0
+
+# For pid namespace, :fork option is available
+options = {:pid => "/path/to/myns/pid", :fork => true}
+# .unshare method with :fork option works like Kernel.#fork after unshare(2)
+if pid = HrrRbLxns.unshare HrrRbLxns::NEWPID, options
+  # In parent, .unshare returns the child process's PID (In this case, it is 1 because unsharing PID namespace)
+  # Do something
+  Process.waitpid pid
+else
+  # In child, .unshare returns nil
+  # Do something
+end
 ```
 
 ### Setns
