@@ -60,7 +60,7 @@ File.stat(options[:uts]).ino                 # => xxx
 FileUtils.mkdir "/path/to/myns"
 HrrRbMount.bind "/path/to/myns" "/path/to/myns"
 HrrRbMount.make_private "/path/to/myns"
-FileUtils.touch "/path/to/myns/mnt/mnt"
+FileUtils.touch "/path/to/myns/mnt"
 options = {:mount => "/path/to/myns/mnt"}
 HrrRbLxns.unshare HrrRbLxns::NEWNS, options # => 0
 ```
