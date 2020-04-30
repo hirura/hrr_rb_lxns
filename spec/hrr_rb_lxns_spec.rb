@@ -22,12 +22,12 @@ RSpec.describe HrrRbLxns do
     begin
       pid = fork do
         blk1.call
-        w.write blk2.call
+        w.write Marshal.dump(blk2.call)
       end
       w.close
       Process.waitpid pid
       raise RuntimeError, "forked process exited with non-zero status." unless $?.to_i.zero?
-      r.read
+      Marshal.load(r.read)
     ensure
       r.close
     end
@@ -44,13 +44,13 @@ RSpec.describe HrrRbLxns do
         p2c_w.close
         c2p_r.close
         blk1.call
-        c2p_w.write blk2.call
+        c2p_w.write Marshal.dump(blk2.call)
         c2p_w.close
         p2c_r.read
       end
       c2p_w.close
       p2c_r.close
-      [pid, [pid, c2p_r.read], p2c_w]
+      [pid, [pid, Marshal.load(c2p_r.read)], p2c_w]
     ensure
       [c2p_r, c2p_w, p2c_r].each{ |io| io.close rescue nil }
     end
@@ -109,8 +109,8 @@ RSpec.describe HrrRbLxns do
               else
                 it "disassociates #{targets.inspect} namespaces" do
                   targets.each{ |ns|
-                    before = File.readlink "/proc/self/ns/#{ns}"
-                    after = namespaces[ns][:func1].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                    before = File.stat("/proc/self/ns/#{ns}").ino
+                    after = namespaces[ns][:func1].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.stat("/proc/self/ns/#{ns}").ino }
                     expect( after ).not_to eq before
                   }
                 end
@@ -125,8 +125,8 @@ RSpec.describe HrrRbLxns do
               else
                 it "keeps #{others.inspect} namespaces" do
                   others.each{ |ns|
-                    before = File.readlink "/proc/self/ns/#{ns}"
-                    after = namespaces[ns][:func1].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                    before = File.stat("/proc/self/ns/#{ns}").ino
+                    after = namespaces[ns][:func1].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.stat("/proc/self/ns/#{ns}").ino }
                     expect( after ).to eq before
                   }
                 end
@@ -154,8 +154,8 @@ RSpec.describe HrrRbLxns do
               else
                 it "disassociates #{targets.inspect} namespaces" do
                   targets.each{ |ns|
-                    before = File.readlink "/proc/self/ns/#{ns}"
-                    after = namespaces[ns][:func1].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                    before = File.stat("/proc/self/ns/#{ns}").ino
+                    after = namespaces[ns][:func1].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.stat("/proc/self/ns/#{ns}").ino }
                     expect( after ).not_to eq before
                   }
                 end
@@ -170,8 +170,8 @@ RSpec.describe HrrRbLxns do
               else
                 it "keeps #{others.inspect} namespaces" do
                   others.each{ |ns|
-                    before = File.readlink "/proc/self/ns/#{ns}"
-                    after = namespaces[ns][:func1].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                    before = File.stat("/proc/self/ns/#{ns}").ino
+                    after = namespaces[ns][:func1].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.stat("/proc/self/ns/#{ns}").ino }
                     expect( after ).to eq before
                   }
                 end
@@ -249,12 +249,12 @@ RSpec.describe HrrRbLxns do
                       options[namespaces[key][:key]] = @persist_files[key].path
                     end
                     targets.each{ |ns|
-                      before = File.readlink "/proc/self/ns/#{ns}"
-                      after = namespaces[ns][:func1].call lambda{ HrrRbLxns.unshare flags, options }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                      before = File.stat("/proc/self/ns/#{ns}").ino
+                      after = namespaces[ns][:func1].call lambda{ HrrRbLxns.unshare flags, options }, lambda{ File.stat("/proc/self/ns/#{ns}").ino }
                       expect( after ).not_to eq before
                       if ns != "pid"
                         expect( HrrRbMount.mountpoint?(@persist_files[ns].path) ).to be true
-                        expect( File.stat(@persist_files[ns].path).ino ).to eq after[/[a-z]+:\[([0-9]+)\]/, 1].to_i
+                        expect( File.stat(@persist_files[ns].path).ino ).to eq after
                       end
                     }
                   end
@@ -273,8 +273,8 @@ RSpec.describe HrrRbLxns do
                       options[namespaces[key][:key]] = @persist_files[key].path
                     end
                     others.each{ |ns|
-                      before = File.readlink "/proc/self/ns/#{ns}"
-                      after = namespaces[ns][:func1].call lambda{ HrrRbLxns.unshare flags, options }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                      before = File.stat("/proc/self/ns/#{ns}").ino
+                      after = namespaces[ns][:func1].call lambda{ HrrRbLxns.unshare flags, options }, lambda{ File.stat("/proc/self/ns/#{ns}").ino }
                       expect( after ).to eq before
                       expect( HrrRbMount.mountpoint?(@persist_files[ns].path) ).to be false
                     }
@@ -311,12 +311,12 @@ RSpec.describe HrrRbLxns do
                       options[namespaces[key][:key]] = @persist_files[key].path
                     end
                     targets.each{ |ns|
-                      before = File.readlink "/proc/self/ns/#{ns}"
-                      after = namespaces[ns][:func1].call lambda{ HrrRbLxns.unshare flags, options }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                      before = File.stat("/proc/self/ns/#{ns}").ino
+                      after = namespaces[ns][:func1].call lambda{ HrrRbLxns.unshare flags, options }, lambda{ File.stat("/proc/self/ns/#{ns}").ino }
                       expect( after ).not_to eq before
                       if ns != "pid"
                         expect( HrrRbMount.mountpoint?(@persist_files[ns].path) ).to be true
-                        expect( File.stat(@persist_files[ns].path).ino ).to eq after[/[a-z]+:\[([0-9]+)\]/, 1].to_i
+                        expect( File.stat(@persist_files[ns].path).ino ).to eq after
                       end
                     }
                   end
@@ -335,8 +335,8 @@ RSpec.describe HrrRbLxns do
                       options[namespaces[key][:key]] = @persist_files[key].path
                     end
                     others.each{ |ns|
-                      before = File.readlink "/proc/self/ns/#{ns}"
-                      after = namespaces[ns][:func1].call lambda{ HrrRbLxns.unshare flags, options }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                      before = File.stat("/proc/self/ns/#{ns}").ino
+                      after = namespaces[ns][:func1].call lambda{ HrrRbLxns.unshare flags, options }, lambda{ File.stat("/proc/self/ns/#{ns}").ino }
                       expect( after ).to eq before
                       expect( HrrRbMount.mountpoint?(@persist_files[ns].path) ).to be false
                     }
@@ -369,7 +369,7 @@ RSpec.describe HrrRbLxns do
                 it "raises SystemCallError" do
                   targets.each{ |ns|
                     begin
-                      pid_to_wait, (pid_target, target), pipe = namespaces[ns][:func2].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                      pid_to_wait, (pid_target, target), pipe = namespaces[ns][:func2].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.stat("/proc/self/ns/#{ns}").ino }
                       expect{ HrrRbLxns.setns flags, pid_target }.to raise_error SystemCallError
                     ensure
                       pipe.close rescue nil
@@ -381,12 +381,12 @@ RSpec.describe HrrRbLxns do
               else
                 it "associates #{targets.inspect} namespaces" do
                   targets.each{ |ns|
-                    before = File.readlink "/proc/self/ns/#{ns}"
+                    before = File.stat("/proc/self/ns/#{ns}").ino
                     target = nil
                     after = nil
                     begin
-                      pid_to_wait, (pid_target, target), pipe = namespaces[ns][:func2].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
-                      after = namespaces[ns][:func1].call lambda{ HrrRbLxns.setns flags, pid_target }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                      pid_to_wait, (pid_target, target), pipe = namespaces[ns][:func2].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.stat("/proc/self/ns/#{ns}").ino }
+                      after = namespaces[ns][:func1].call lambda{ HrrRbLxns.setns flags, pid_target }, lambda{ File.stat("/proc/self/ns/#{ns}").ino }
                     ensure
                       pipe.close rescue nil
                       Process.waitpid pid_to_wait
@@ -409,12 +409,12 @@ RSpec.describe HrrRbLxns do
               else
                 it "keeps #{others.inspect} namespaces" do
                   others.each{ |ns|
-                    before = File.readlink "/proc/self/ns/#{ns}"
+                    before = File.stat("/proc/self/ns/#{ns}").ino
                     target = nil
                     after = nil
                     begin
-                      pid_to_wait, (pid_target, target), pipe = namespaces[ns][:func2].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
-                      after = namespaces[ns][:func1].call lambda{ HrrRbLxns.setns flags, pid_target }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                      pid_to_wait, (pid_target, target), pipe = namespaces[ns][:func2].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.stat("/proc/self/ns/#{ns}").ino }
+                      after = namespaces[ns][:func1].call lambda{ HrrRbLxns.setns flags, pid_target }, lambda{ File.stat("/proc/self/ns/#{ns}").ino }
                     ensure
                       pipe.close rescue nil
                       Process.waitpid pid_to_wait
@@ -447,7 +447,7 @@ RSpec.describe HrrRbLxns do
                 it "raises SystemCallError" do
                   targets.each{ |ns|
                     begin
-                      pid_to_wait, (pid_target, target), pipe = namespaces[ns][:func2].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                      pid_to_wait, (pid_target, target), pipe = namespaces[ns][:func2].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.stat("/proc/self/ns/#{ns}").ino }
                       expect{ HrrRbLxns.setns flags, pid_target }.to raise_error SystemCallError
                     ensure
                       pipe.close rescue nil
@@ -459,12 +459,12 @@ RSpec.describe HrrRbLxns do
               else
                 it "associates #{targets.inspect} namespaces" do
                   targets.each{ |ns|
-                    before = File.readlink "/proc/self/ns/#{ns}"
+                    before = File.stat("/proc/self/ns/#{ns}").ino
                     target = nil
                     after = nil
                     begin
-                      pid_to_wait, (pid_target, target), pipe = namespaces[ns][:func2].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
-                      after = namespaces[ns][:func1].call lambda{ HrrRbLxns.setns flags, pid_target }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                      pid_to_wait, (pid_target, target), pipe = namespaces[ns][:func2].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.stat("/proc/self/ns/#{ns}").ino }
+                      after = namespaces[ns][:func1].call lambda{ HrrRbLxns.setns flags, pid_target }, lambda{ File.stat("/proc/self/ns/#{ns}").ino }
                     ensure
                       pipe.close rescue nil
                       Process.waitpid pid_to_wait
@@ -487,12 +487,12 @@ RSpec.describe HrrRbLxns do
               else
                 it "keeps #{others.inspect} namespaces" do
                   others.each{ |ns|
-                    before = File.readlink "/proc/self/ns/#{ns}"
+                    before = File.stat("/proc/self/ns/#{ns}").ino
                     target = nil
                     after = nil
                     begin
-                      pid_to_wait, (pid_target, target), pipe = namespaces[ns][:func2].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
-                      after = namespaces[ns][:func1].call lambda{ HrrRbLxns.setns flags, pid_target }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                      pid_to_wait, (pid_target, target), pipe = namespaces[ns][:func2].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.stat("/proc/self/ns/#{ns}").ino }
+                      after = namespaces[ns][:func1].call lambda{ HrrRbLxns.setns flags, pid_target }, lambda{ File.stat("/proc/self/ns/#{ns}").ino }
                     ensure
                       pipe.close rescue nil
                       Process.waitpid pid_to_wait
