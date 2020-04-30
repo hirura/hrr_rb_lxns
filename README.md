@@ -45,6 +45,26 @@ File.readlink "/proc/self/ns/uts"   # => uts:[xxx]
 File.readlink "/proc/self/ns/mnt"   # => mnt:[yyy]
 ```
 
+HrrRbLxns.unshare supports creating persistent namespaces files by bind-mount. The files are specified in an options hash. The keys which are available in the hash for each namespace are `:mount`, `:uts`, `:ipc`, `:network`, `:pid`, `:user`, `:cgroup`, and `:time`.
+Note that files that namespaces are bind-mounted must exist. The library does just bind-mount, not create the files. And the files and their mount information are kept after the caller process is finished.
+
+```ruby
+File.readlink "/proc/self/ns/uts"            # => uts:[aaa]
+# Prepare an options hash to specify a file that namespaces are bind-mounted
+options = {:uts => "/path/to/myns/uts"}
+HrrRbLxns.unshare HrrRbLxns::NEWUTS, options # => 0
+File.readlink "/proc/self/ns/uts"            # => uts:[xxx]
+File.stat(options[:uts]).ino                 # => xxx
+
+# For mount namespace, the parent directory's propagation needs to be private
+FileUtils.mkdir "/path/to/myns"
+HrrRbMount.bind "/path/to/myns" "/path/to/myns"
+HrrRbMount.make_private "/path/to/myns"
+FileUtils.touch "/path/to/myns/mnt/mnt"
+options = {:mount => "/path/to/myns/mnt"}
+HrrRbLxns.unshare HrrRbLxns::NEWNS, options # => 0
+```
+
 ### Setns
 
 HrrRbLxns.setns method wraps around setns(2) system call. The system call associate the caller process's namespace to an existing one, which is disassociated by some other process.
