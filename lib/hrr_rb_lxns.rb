@@ -1,5 +1,6 @@
 require "hrr_rb_lxns/version"
 require "hrr_rb_lxns/hrr_rb_lxns"
+require "hrr_rb_mount"
 
 # Utilities working with Linux namespaces for CRuby.
 module HrrRbLxns
@@ -33,14 +34,42 @@ module HrrRbLxns
   #   "U" : NEWUSER <br>
   #   "C" : NEWCGROUP <br>
   #   "T" : NEWTIME <br>
-  # @param options [Hash] For future use.
+  # @param options [Hash] Optional arguments.
+  # @option options [String] :mount   A persistent mount namespace to be created by bind mount.
+  # @option options [String] :uts     A persistent uts namespace to be created by bind mount.
+  # @option options [String] :ipc     A persistent ipc namespace to be created by bind mount.
+  # @option options [String] :network A persistent network namespace to be created by bind mount.
+  # @option options [String] :pid     A persistent pid namespace to be created by bind mount.
+  # @option options [String] :user    A persistent user namespace to be created by bind mount.
+  # @option options [String] :cgroup  A persistent cgroup namespace to be created by bind mount.
+  # @option options [String] :time    A persistent time namespace to be created by bind mount.
   # @return [Integer] 0.
   # @raise [ArgumentError] When given flags argument is not appropriate.
   # @raise [Errno::EXXX] In case unshare(2) system call failed.
-
   def self.unshare flags, options={}
     _flags = interpret_flags flags
-    __unshare__ _flags
+    io = nil
+    child_pid = nil
+    begin
+      io = IO.pipe
+      child_pid = bind_ns_files_from_child _flags, options, io
+      ret = __unshare__ _flags
+      bind_ns_files _flags, options, child_pid, io
+      ret
+    ensure
+      if io
+        io_r, io_w = io
+        io_w.write "1" rescue nil # just in case "mnt" flag is set but gets an error before io_w.write in bind_ns_files
+        io_w.close     rescue nil
+        io_r.close     rescue nil
+      end
+      if child_pid
+        begin
+          Process.waitpid child_pid
+        rescue Errno::ECHILD
+        end
+      end
+    end
   end
 
   # A wrapper around setns(2) system call.
@@ -116,6 +145,54 @@ module HrrRbLxns
       elsif c == "C" && const_defined?(:NEWCGROUP) then f | NEWCGROUP
       elsif c == "T" && const_defined?(:NEWTIME)   then f | NEWTIME
       else raise ArgumentError, "unsupported flag charactor: #{c.inspect}"
+      end
+    end
+  end
+
+  # In some cases, namespace files need to be created by an external process.
+  # Thus, this method calls fork and the child process creates the namespace files.
+  def self.bind_ns_files_from_child flags, options, io
+    ppid = Process.pid
+    io_r, io_w = io
+    if pid = fork
+      pid
+    else
+      exit_status = true
+      begin
+        io_r.read 1
+        bind_ns_files flags, options, nil, nil, ppid
+      rescue Exception => e
+        exit_status = false
+        io_w.write Marshal.dump(e)
+      ensure
+        exit! exit_status
+      end
+    end
+  end
+
+  def self.bind_ns_files flags, options, child_pid, io, pid="self"
+    if child_pid
+      io_r, io_w = io
+      io_w.write "1"
+      io_w.close rescue nil
+      _, status = Process.waitpid2 child_pid
+      if status.exitstatus != 0
+        raise Marshal.load(io_r.read)
+      end
+    else
+      list = Array.new
+      list.push ["ipc",    NEWIPC,    :ipc    ] if const_defined?(:NEWIPC)
+      list.push ["mnt",    NEWNS,     :mount  ] if const_defined?(:NEWNS)
+      list.push ["net",    NEWNET,    :network] if const_defined?(:NEWNET)
+      list.push ["pid",    NEWPID,    :pid    ] if const_defined?(:NEWPID) # TODO: pid namespace must be bind-mounted against the child process's
+      list.push ["uts",    NEWUTS,    :uts    ] if const_defined?(:NEWUTS)
+      list.push ["user",   NEWUSER,   :user   ] if const_defined?(:NEWUSER)
+      list.push ["cgroup", NEWCGROUP, :cgroup ] if const_defined?(:NEWCGROUP)
+      list.push ["time",   NEWTIME,   :time   ] if const_defined?(:NEWTIME)
+      list.each do |name, flag, key|
+        if (flags & flag).zero?.! && options[key]
+          HrrRbMount.bind "/proc/#{pid}/ns/#{name}", options[key]
+        end
       end
     end
   end

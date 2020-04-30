@@ -21,4 +21,6 @@ Gem::Specification.new do |spec|
   end
   spec.require_paths = ["lib"]
   spec.extensions    = ["ext/hrr_rb_lxns/extconf.rb"]
+
+  spec.add_dependency "hrr_rb_mount", ">= 0.3.0"
 end
