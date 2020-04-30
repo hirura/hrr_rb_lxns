@@ -43,13 +43,19 @@ module HrrRbLxns
   # @option options [String] :user    A persistent user namespace to be created by bind mount.
   # @option options [String] :cgroup  A persistent cgroup namespace to be created by bind mount.
   # @option options [String] :time    A persistent time namespace to be created by bind mount.
-  # @return [Integer] 0.
+  # @option options [Boolean] :fork If specified, the caller process forks after unshare.
+  # @return [Integer, nil] Usually 0. If :fork is specified in options, then PID of the child process in parent, nil in child (as same as Kernel.#fork).
   # @raise [ArgumentError] When given flags argument is not appropriate.
   # @raise [Errno::EXXX] In case unshare(2) system call failed.
   def self.unshare flags, options={}
     _flags = interpret_flags flags
     bind_ns_files_from_child(_flags, options) do
-      __unshare__ _flags
+      if fork? options
+        __unshare__ _flags
+        fork
+      else
+        __unshare__ _flags
+      end
     end
   end
 
@@ -130,6 +136,10 @@ module HrrRbLxns
     end
   end
 
+  def self.fork? options
+    options[:fork]
+  end
+
   def self.bind_ns_files? options
     list = Array.new
     list.push :ipc     if const_defined?(:NEWIPC)
@@ -147,16 +157,18 @@ module HrrRbLxns
   # Thus, this method calls fork and the child process creates the namespace files.
   def self.bind_ns_files_from_child flags, options
     if bind_ns_files? options
+      pid_to_bind = Process.pid
       pid = nil
       begin
         io_r, io_w = IO.pipe
-        pid_to_bind = Process.pid
         if pid = fork
           ret = yield
           io_w.write "1"
           io_w.close
-          _, status = Process.waitpid2 pid
-          raise Marshal.load(io_r.read) if status.exitstatus != 0
+          if pid_to_bind == Process.pid
+            _, status = Process.waitpid2 pid
+            raise Marshal.load(io_r.read) if status.exitstatus != 0
+          end
           ret
         else
           begin
@@ -174,9 +186,11 @@ module HrrRbLxns
         io_w.write "1" rescue nil # just in case getting an error before io_w.write
         io_w.close     rescue nil
         io_r.close     rescue nil
-        begin
-          Process.waitpid pid
-        rescue Errno::ECHILD
+        if pid_to_bind == Process.pid
+          begin
+            Process.waitpid pid
+          rescue Errno::ECHILD
+          end
         end
       end
     else
@@ -189,7 +203,10 @@ module HrrRbLxns
     list.push ["ipc",    NEWIPC,    :ipc    ] if const_defined?(:NEWIPC)
     list.push ["mnt",    NEWNS,     :mount  ] if const_defined?(:NEWNS)
     list.push ["net",    NEWNET,    :network] if const_defined?(:NEWNET)
-    list.push ["pid",    NEWPID,    :pid    ] if const_defined?(:NEWPID) # TODO: pid namespace must be bind-mounted against the child process's
+    list.push ["pid",    NEWPID,    :pid    ] if const_defined?(:NEWPID)
+    if File.exist? "/proc/#{pid}/ns/pid_for_children"
+      list.last[0] = "pid_for_children"
+    end
     list.push ["uts",    NEWUTS,    :uts    ] if const_defined?(:NEWUTS)
     list.push ["user",   NEWUSER,   :user   ] if const_defined?(:NEWUSER)
     list.push ["cgroup", NEWCGROUP, :cgroup ] if const_defined?(:NEWCGROUP)
