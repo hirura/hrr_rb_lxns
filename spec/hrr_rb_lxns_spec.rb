@@ -1,3 +1,7 @@
+require "tmpdir"
+require "tempfile"
+require "fileutils"
+
 RSpec.describe HrrRbLxns do
   it "has a version number" do
     expect(HrrRbLxns::VERSION).not_to be nil
@@ -188,6 +192,159 @@ RSpec.describe HrrRbLxns do
       context "when invalid value" do
         it "raises SystemCallError" do
           expect{ HrrRbLxns.unshare -1 }.to raise_error SystemCallError
+        end
+      end
+    end
+
+    context "with options" do
+      context "with namespace file specified" do
+        before :example do
+          @tmpdir = Dir.mktmpdir
+          HrrRbMount.bind @tmpdir, @tmpdir
+          HrrRbMount.make_private @tmpdir
+          @persist_files = {
+                             "mnt"    => Tempfile.new("mnt",    @tmpdir),
+                             "uts"    => Tempfile.new("uts",    @tmpdir),
+                             "ipc"    => Tempfile.new("ipc",    @tmpdir),
+                             "net"    => Tempfile.new("net",    @tmpdir),
+                             "pid"    => Tempfile.new("pid",    @tmpdir),
+                             "user"   => Tempfile.new("user",   @tmpdir),
+                             "cgroup" => Tempfile.new("cgroup", @tmpdir),
+                             "time"   => Tempfile.new("time",   @tmpdir),
+                           }
+        end
+
+        after :example do
+          @persist_files.values.each do |tmpfile|
+            nil while system "mountpoint -q #{tmpfile.path} && umount #{tmpfile.path}"
+            tmpfile.close!
+          end
+          nil while system "mountpoint -q #{@tmpdir} && umount #{@tmpdir}"
+          FileUtils.remove_entry_secure @tmpdir
+        end
+
+        0.upto(namespaces.size) do |n|
+          namespaces.keys.combination(n).each do |c|
+            targets = c
+            others  = namespaces.keys - targets
+
+            flags = targets.inject(""){|fs, t| fs + namespaces[t][:short]}
+
+            context "with #{flags.inspect} flags" do
+              unless targets.empty?
+                if (Gem.ruby_version < Gem::Version.create("2.3")) && targets.include?("pid")
+                  # Do nothing because unshare with NEWPID flag fails
+                elsif (Gem.ruby_version < Gem::Version.create("2.6")) && targets.include?("user")
+                  it "raises SystemCallError" do
+                    options = Hash.new
+                    targets.each do |key|
+                      options[namespaces[key][:key]] = @persist_files[key].path
+                    end
+                    expect{ HrrRbLxns.unshare flags, options }.to raise_error SystemCallError
+                  end
+                else
+                  it "disassociates #{targets.inspect} namespaces and bind-mounts them" do
+                    options = Hash.new
+                    targets.each do |key|
+                      options[namespaces[key][:key]] = @persist_files[key].path
+                    end
+                    targets.each{ |ns|
+                      before = File.readlink "/proc/self/ns/#{ns}"
+                      after = namespaces[ns][:func1].call lambda{ HrrRbLxns.unshare flags, options }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                      expect( after ).not_to eq before
+                      if ns != "pid"
+                        expect( HrrRbMount.mountpoint?(@persist_files[ns].path) ).to be true
+                        expect( File.stat(@persist_files[ns].path).ino ).to eq after[/[a-z]+:\[([0-9]+)\]/, 1].to_i
+                      end
+                    }
+                  end
+                end
+              end
+
+              unless others.empty?
+                if (Gem.ruby_version < Gem::Version.create("2.3")) && targets.include?("pid")
+                  # Do nothing because unshare with NEWPID flag fails
+                elsif (Gem.ruby_version < Gem::Version.create("2.6")) && targets.include?("user")
+                  # Do nothing because unshare with NEWUSER flag fails
+                else
+                  it "keeps #{others.inspect} namespaces" do
+                    options = Hash.new
+                    targets.each do |key|
+                      options[namespaces[key][:key]] = @persist_files[key].path
+                    end
+                    others.each{ |ns|
+                      before = File.readlink "/proc/self/ns/#{ns}"
+                      after = namespaces[ns][:func1].call lambda{ HrrRbLxns.unshare flags, options }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                      expect( after ).to eq before
+                      expect( HrrRbMount.mountpoint?(@persist_files[ns].path) ).to be false
+                    }
+                  end
+                end
+              end
+            end
+          end
+        end
+
+        0.upto(namespaces.size) do |n|
+          namespaces.keys.combination(n).each do |c|
+            targets = c
+            others  = namespaces.keys - targets
+
+            flags = targets.inject(0){|fs, t| fs | namespaces[t][:flag]}
+
+            context "with (#{targets.inject([]){|fs, t| fs + [namespaces[t][:long]]}.join(" | ")}) flags" do
+              unless targets.empty?
+                if (Gem.ruby_version < Gem::Version.create("2.3")) && targets.include?("pid")
+                  # Do nothing because unshare with NEWPID flag fails
+                elsif (Gem.ruby_version < Gem::Version.create("2.6")) && targets.include?("user")
+                  it "raises SystemCallError" do
+                    options = Hash.new
+                    targets.each do |key|
+                      options[namespaces[key][:key]] = @persist_files[key].path
+                    end
+                    expect{ HrrRbLxns.unshare flags, options }.to raise_error SystemCallError
+                  end
+                else
+                  it "disassociates #{targets.inspect} namespaces and bind-mounts them" do
+                    options = Hash.new
+                    targets.each do |key|
+                      options[namespaces[key][:key]] = @persist_files[key].path
+                    end
+                    targets.each{ |ns|
+                      before = File.readlink "/proc/self/ns/#{ns}"
+                      after = namespaces[ns][:func1].call lambda{ HrrRbLxns.unshare flags, options }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                      expect( after ).not_to eq before
+                      if ns != "pid"
+                        expect( HrrRbMount.mountpoint?(@persist_files[ns].path) ).to be true
+                        expect( File.stat(@persist_files[ns].path).ino ).to eq after[/[a-z]+:\[([0-9]+)\]/, 1].to_i
+                      end
+                    }
+                  end
+                end
+              end
+
+              unless others.empty?
+                if (Gem.ruby_version < Gem::Version.create("2.3")) && targets.include?("pid")
+                  # Do nothing because unshare with NEWPID flag fails
+                elsif (Gem.ruby_version < Gem::Version.create("2.6")) && targets.include?("user")
+                  # Do nothing because unshare with NEWUSER flag fails
+                else
+                  it "keeps #{others.inspect} namespaces" do
+                    options = Hash.new
+                    targets.each do |key|
+                      options[namespaces[key][:key]] = @persist_files[key].path
+                    end
+                    others.each{ |ns|
+                      before = File.readlink "/proc/self/ns/#{ns}"
+                      after = namespaces[ns][:func1].call lambda{ HrrRbLxns.unshare flags, options }, lambda{ File.readlink "/proc/self/ns/#{ns}" }
+                      expect( after ).to eq before
+                      expect( HrrRbMount.mountpoint?(@persist_files[ns].path) ).to be false
+                    }
+                  end
+                end
+              end
+            end
+          end
         end
       end
     end
