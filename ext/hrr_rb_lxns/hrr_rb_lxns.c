@@ -1,6 +1,7 @@
 #include "hrr_rb_lxns.h"
 #define _GNU_SOURCE 1
 #include <sched.h>
+#include <linux/version.h>
 
 VALUE rb_mHrrRbLxns;
 VALUE rb_mHrrRbLxnsConst;
@@ -106,6 +107,11 @@ Init_hrr_rb_lxns(void)
 #ifdef CLONE_NEWCGROUP
   /* Represents cgroup namespace. */
   rb_define_const(rb_mHrrRbLxnsConst, "NEWCGROUP", INT2FIX(CLONE_NEWCGROUP));
+#endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,6,0)
+# ifndef CLONE_NEWTIME
+#  define CLONE_NEWTIME	0x00000080
+# endif
 #endif
 #ifdef CLONE_NEWTIME
   /* Represents time namespace. */

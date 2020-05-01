@@ -200,17 +200,17 @@ module HrrRbLxns
 
   def self.bind_ns_files flags, options, pid
     list = Array.new
-    list.push ["ipc",    NEWIPC,    :ipc    ] if const_defined?(:NEWIPC)
-    list.push ["mnt",    NEWNS,     :mount  ] if const_defined?(:NEWNS)
-    list.push ["net",    NEWNET,    :network] if const_defined?(:NEWNET)
-    list.push ["pid",    NEWPID,    :pid    ] if const_defined?(:NEWPID)
+    list.push ["ipc",               NEWIPC,    :ipc    ] if const_defined?(:NEWIPC)
+    list.push ["mnt",               NEWNS,     :mount  ] if const_defined?(:NEWNS)
+    list.push ["net",               NEWNET,    :network] if const_defined?(:NEWNET)
+    list.push ["pid",               NEWPID,    :pid    ] if const_defined?(:NEWPID)
     if File.exist? "/proc/#{pid}/ns/pid_for_children"
       list.last[0] = "pid_for_children"
     end
-    list.push ["uts",    NEWUTS,    :uts    ] if const_defined?(:NEWUTS)
-    list.push ["user",   NEWUSER,   :user   ] if const_defined?(:NEWUSER)
-    list.push ["cgroup", NEWCGROUP, :cgroup ] if const_defined?(:NEWCGROUP)
-    list.push ["time",   NEWTIME,   :time   ] if const_defined?(:NEWTIME)
+    list.push ["uts",               NEWUTS,    :uts    ] if const_defined?(:NEWUTS)
+    list.push ["user",              NEWUSER,   :user   ] if const_defined?(:NEWUSER)
+    list.push ["cgroup",            NEWCGROUP, :cgroup ] if const_defined?(:NEWCGROUP)
+    list.push ["time_for_children", NEWTIME,   :time   ] if const_defined?(:NEWTIME)
     list.each do |name, flag, key|
       if (flags & flag).zero?.! && options[key]
         HrrRbMount.bind "/proc/#{pid}/ns/#{name}", options[key]

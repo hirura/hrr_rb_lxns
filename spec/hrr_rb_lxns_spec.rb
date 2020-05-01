@@ -87,7 +87,7 @@ RSpec.describe HrrRbLxns do
   namespaces["pid"]    = {short: "p", long: "NEWPID",    flag: HrrRbLxns::NEWPID,    key: :pid,     func1: fork_yld1_fork_yld2, func2: fork_yld1_fork_yld2_wait} if HrrRbLxns.const_defined? :NEWPID
   namespaces["user"]   = {short: "U", long: "NEWUSER",   flag: HrrRbLxns::NEWUSER,   key: :user,    func1: fork_yld1_yld2,      func2: fork_yld1_yld2_wait     } if HrrRbLxns.const_defined? :NEWUSER
   namespaces["cgroup"] = {short: "C", long: "NEWCGROUP", flag: HrrRbLxns::NEWCGROUP, key: :cgroup,  func1: fork_yld1_yld2,      func2: fork_yld1_yld2_wait     } if HrrRbLxns.const_defined? :NEWCGROUP
-  namespaces["time"]   = {short: "T", long: "NEWTIME",   flag: HrrRbLxns::NEWTIME,   key: :time,    func1: fork_yld1_yld2,      func2: fork_yld1_yld2_wait     } if HrrRbLxns.const_defined? :NEWTIME
+  namespaces["time"]   = {short: "T", long: "NEWTIME",   flag: HrrRbLxns::NEWTIME,   key: :time,    func1: fork_yld1_fork_yld2, func2: fork_yld1_fork_yld2_wait} if HrrRbLxns.const_defined? :NEWTIME
 
   describe ".unshare" do
     context "with no options" do
