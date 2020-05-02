@@ -203,10 +203,7 @@ module HrrRbLxns
     list.push ["ipc",               NEWIPC,    :ipc    ] if const_defined?(:NEWIPC)
     list.push ["mnt",               NEWNS,     :mount  ] if const_defined?(:NEWNS)
     list.push ["net",               NEWNET,    :network] if const_defined?(:NEWNET)
-    list.push ["pid",               NEWPID,    :pid    ] if const_defined?(:NEWPID)
-    if File.exist? "/proc/#{pid}/ns/pid_for_children"
-      list.last[0] = "pid_for_children"
-    end
+    list.push ["pid_for_children",  NEWPID,    :pid    ] if const_defined?(:NEWPID)
     list.push ["uts",               NEWUTS,    :uts    ] if const_defined?(:NEWUTS)
     list.push ["user",              NEWUSER,   :user   ] if const_defined?(:NEWUSER)
     list.push ["cgroup",            NEWCGROUP, :cgroup ] if const_defined?(:NEWCGROUP)
