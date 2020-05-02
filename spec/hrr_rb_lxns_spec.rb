@@ -17,19 +17,48 @@ RSpec.describe HrrRbLxns do
   end
 
 
-  fork_yld1_yld2 = lambda{ |blk1, blk2|
-    r, w = IO.pipe
+  fork_yld = lambda{ |blk|
+    r, w, err_r, err_w = IO.pipe + IO.pipe
     begin
       pid = fork do
-        blk1.call
-        w.write Marshal.dump(blk2.call)
+        begin
+          w.write Marshal.dump(blk.call)
+        rescue Exception => e
+          err_w.write Marshal.dump(e)
+          exit! false
+        else
+          exit! true
+        end
       end
-      w.close
+      w.close; err_w.close
       Process.waitpid pid
-      raise RuntimeError, "forked process exited with non-zero status." unless $?.to_i.zero?
+      raise Marshal.load(err_r.read) unless $?.to_i.zero?
       Marshal.load(r.read)
     ensure
-      r.close
+      r.close; err_r.close
+    end
+  }
+
+  fork_yld1_yld2 = lambda{ |blk1, blk2|
+    r, w, err_r, err_w = IO.pipe + IO.pipe
+    begin
+      pid = fork do
+        begin
+          blk1.call
+          w.write Marshal.dump(blk2.call)
+        rescue Exception => e
+          err_w.write Marshal.dump(e)
+          exit! false
+        else
+          exit! true
+        end
+      end
+      w.close; err_w.close
+      Process.waitpid pid
+      raise Marshal.load(err_r.read) unless $?.to_i.zero?
+      Marshal.load(r.read)
+    ensure
+      r.close; err_r.close
     end
   }
 
@@ -104,7 +133,7 @@ RSpec.describe HrrRbLxns do
                 # Do nothing because unshare with NEWPID flag fails
               elsif (Gem.ruby_version < Gem::Version.create("2.6")) && targets.include?("user")
                 it "raises SystemCallError" do
-                  expect{ HrrRbLxns.unshare flags }.to raise_error SystemCallError
+                  expect{ fork_yld.call lambda{ HrrRbLxns.unshare flags } }.to raise_error SystemCallError
                 end
               else
                 it "disassociates #{targets.inspect} namespaces" do
@@ -149,7 +178,7 @@ RSpec.describe HrrRbLxns do
                 # Do nothing because unshare with NEWPID flag fails
               elsif (Gem.ruby_version < Gem::Version.create("2.6")) && targets.include?("user")
                 it "raises SystemCallError" do
-                  expect{ HrrRbLxns.unshare flags }.to raise_error SystemCallError
+                  expect{ fork_yld.call lambda{ HrrRbLxns.unshare flags } }.to raise_error SystemCallError
                 end
               else
                 it "disassociates #{targets.inspect} namespaces" do
@@ -185,13 +214,13 @@ RSpec.describe HrrRbLxns do
     context "with invalid flags" do
       context "when unsupported charactor" do
         it "raises ArgumentError" do
-          expect{ HrrRbLxns.unshare (("A".."Z").to_a + ("a".."z").to_a).join("") }.to raise_error ArgumentError
+          expect{ fork_yld.call lambda{ HrrRbLxns.unshare (("A".."Z").to_a + ("a".."z").to_a).join("") } }.to raise_error ArgumentError
         end
       end
 
       context "when invalid value" do
         it "raises SystemCallError" do
-          expect{ HrrRbLxns.unshare -1 }.to raise_error SystemCallError
+          expect{ fork_yld.call lambda{ HrrRbLxns.unshare -1 } }.to raise_error SystemCallError
         end
       end
     end
@@ -240,27 +269,17 @@ RSpec.describe HrrRbLxns do
                     targets.each do |key|
                       options[namespaces[key][:key]] = @persist_files[key].path
                     end
-                    expect{ HrrRbLxns.unshare flags, options }.to raise_error SystemCallError
+                    expect{ fork_yld.call lambda{ HrrRbLxns.unshare flags, options } }.to raise_error SystemCallError
                   end
                 else
                   if targets.include? "pid"
                     context "without :fork option" do
-                      it "disassociates #{targets.inspect} namespaces and bind-mounts them except for pid" do
+                      it "raises SystemCallError" do
                         options = Hash.new
                         targets.each do |key|
                           options[namespaces[key][:key]] = @persist_files[key].path
                         end
-                        targets.each{ |ns|
-                          before = File.stat("/proc/self/ns/#{ns}").ino
-                          after = namespaces[ns][:func1].call lambda{ HrrRbLxns.unshare flags, options }, lambda{ File.stat("/proc/self/ns/#{ns}").ino }
-                          expect( after ).not_to eq before
-                          expect( HrrRbMount.mountpoint?(@persist_files[ns].path) ).to be true
-                          if ns == "pid"
-                            expect( File.stat(@persist_files[ns].path).ino ).to_not eq after
-                          else
-                            expect( File.stat(@persist_files[ns].path).ino ).to eq after
-                          end
-                        }
+                        expect{ fork_yld.call lambda{ HrrRbLxns.unshare flags, options } }.to raise_error SystemCallError
                       end
                     end
                     context "with :fork option" do
@@ -293,27 +312,6 @@ RSpec.describe HrrRbLxns do
                         expect( File.stat(@persist_files[ns].path).ino ).to eq after
                       }
                     end
-                  end
-                end
-              end
-
-              unless others.empty?
-                if (Gem.ruby_version < Gem::Version.create("2.3")) && targets.include?("pid")
-                  # Do nothing because unshare with NEWPID flag fails
-                elsif (Gem.ruby_version < Gem::Version.create("2.6")) && targets.include?("user")
-                  # Do nothing because unshare with NEWUSER flag fails
-                else
-                  it "keeps #{others.inspect} namespaces" do
-                    options = Hash.new
-                    targets.each do |key|
-                      options[namespaces[key][:key]] = @persist_files[key].path
-                    end
-                    others.each{ |ns|
-                      before = File.stat("/proc/self/ns/#{ns}").ino
-                      after = namespaces[ns][:func1].call lambda{ HrrRbLxns.unshare flags, options }, lambda{ File.stat("/proc/self/ns/#{ns}").ino }
-                      expect( after ).to eq before
-                      expect( HrrRbMount.mountpoint?(@persist_files[ns].path) ).to be false
-                    }
                   end
                 end
               end
@@ -338,27 +336,17 @@ RSpec.describe HrrRbLxns do
                     targets.each do |key|
                       options[namespaces[key][:key]] = @persist_files[key].path
                     end
-                    expect{ HrrRbLxns.unshare flags, options }.to raise_error SystemCallError
+                    expect{ fork_yld.call lambda{ HrrRbLxns.unshare flags, options } }.to raise_error SystemCallError
                   end
                 else
                   if targets.include? "pid"
                     context "without :fork option" do
-                      it "disassociates #{targets.inspect} namespaces and bind-mounts them except for pid" do
+                      it "raises SystemCallError" do
                         options = Hash.new
                         targets.each do |key|
                           options[namespaces[key][:key]] = @persist_files[key].path
                         end
-                        targets.each{ |ns|
-                          before = File.stat("/proc/self/ns/#{ns}").ino
-                          after = namespaces[ns][:func1].call lambda{ HrrRbLxns.unshare flags, options }, lambda{ File.stat("/proc/self/ns/#{ns}").ino }
-                          expect( after ).not_to eq before
-                          expect( HrrRbMount.mountpoint?(@persist_files[ns].path) ).to be true
-                          if ns == "pid"
-                            expect( File.stat(@persist_files[ns].path).ino ).to_not eq after
-                          else
-                            expect( File.stat(@persist_files[ns].path).ino ).to eq after
-                          end
-                        }
+                        expect{ fork_yld.call lambda{ HrrRbLxns.unshare flags, options } }.to raise_error SystemCallError
                       end
                     end
                     context "with :fork option" do
@@ -391,27 +379,6 @@ RSpec.describe HrrRbLxns do
                         expect( File.stat(@persist_files[ns].path).ino ).to eq after
                       }
                     end
-                  end
-                end
-              end
-
-              unless others.empty?
-                if (Gem.ruby_version < Gem::Version.create("2.3")) && targets.include?("pid")
-                  # Do nothing because unshare with NEWPID flag fails
-                elsif (Gem.ruby_version < Gem::Version.create("2.6")) && targets.include?("user")
-                  # Do nothing because unshare with NEWUSER flag fails
-                else
-                  it "keeps #{others.inspect} namespaces" do
-                    options = Hash.new
-                    targets.each do |key|
-                      options[namespaces[key][:key]] = @persist_files[key].path
-                    end
-                    others.each{ |ns|
-                      before = File.stat("/proc/self/ns/#{ns}").ino
-                      after = namespaces[ns][:func1].call lambda{ HrrRbLxns.unshare flags, options }, lambda{ File.stat("/proc/self/ns/#{ns}").ino }
-                      expect( after ).to eq before
-                      expect( HrrRbMount.mountpoint?(@persist_files[ns].path) ).to be false
-                    }
                   end
                 end
               end
@@ -442,7 +409,7 @@ RSpec.describe HrrRbLxns do
                   targets.each{ |ns|
                     begin
                       pid_to_wait, (pid_target, target), pipe = namespaces[ns][:func2].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.stat("/proc/self/ns/#{ns}").ino }
-                      expect{ HrrRbLxns.setns flags, pid_target }.to raise_error SystemCallError
+                      expect{ fork_yld.call lambda{ HrrRbLxns.setns flags, pid_target } }.to raise_error SystemCallError
                     ensure
                       pipe.close rescue nil
                       Process.waitpid pid_to_wait
@@ -520,7 +487,7 @@ RSpec.describe HrrRbLxns do
                   targets.each{ |ns|
                     begin
                       pid_to_wait, (pid_target, target), pipe = namespaces[ns][:func2].call lambda{ HrrRbLxns.unshare flags }, lambda{ File.stat("/proc/self/ns/#{ns}").ino }
-                      expect{ HrrRbLxns.setns flags, pid_target }.to raise_error SystemCallError
+                      expect{ fork_yld.call lambda{ HrrRbLxns.setns flags, pid_target } }.to raise_error SystemCallError
                     ensure
                       pipe.close rescue nil
                       Process.waitpid pid_to_wait
@@ -759,13 +726,13 @@ RSpec.describe HrrRbLxns do
     context "with invalid flags" do
       context "when unsupported charactor" do
         it "raises ArgumentError" do
-          expect{ HrrRbLxns.setns (("A".."Z").to_a + ("a".."z").to_a).join(""), Process.pid }.to raise_error ArgumentError
+          expect{ fork_yld.call lambda{ HrrRbLxns.setns (("A".."Z").to_a + ("a".."z").to_a).join(""), Process.pid } }.to raise_error ArgumentError
         end
       end
 
       context "when invalid value" do
         it "raises SystemCallError" do
-          expect{ HrrRbLxns.setns -1, Process.pid }.to raise_error SystemCallError
+          expect{ fork_yld.call lambda{ HrrRbLxns.setns -1, Process.pid } }.to raise_error SystemCallError
         end
       end
     end
