@@ -44,8 +44,30 @@ RSpec.describe HrrRbLxns do
     begin
       pid = fork do
         begin
-          blk1.call
-          w.write Marshal.dump(blk2.call)
+          _r, _w, _err_r, _err_w = IO.pipe + IO.pipe
+          # blk1.call can fork, 0 for no fork, >1 for parent, nil for child
+          if _pid = blk1.call
+            # blk1.call did not fork
+            if _pid == 0
+              w.write Marshal.dump(blk2.call)
+            # blk1.call did fork
+            else
+              _w.close; _err_w.close
+              Process.waitpid _pid
+              raise Marshal.load(_err_r.read) unless $?.to_i.zero?
+              w.write Marshal.dump(Marshal.load(_r.read))
+            end
+          # blk1.call did fork
+          else
+            begin
+              _w.write Marshal.dump(blk2.call)
+            rescue Exception => e
+              _err_w.write Marshal.dump(e)
+              exit! false
+            else
+              exit! true
+            end
+          end
         rescue Exception => e
           err_w.write Marshal.dump(e)
           exit! false
@@ -63,7 +85,7 @@ RSpec.describe HrrRbLxns do
   }
 
   fork_yld1_fork_yld2 = lambda{ |blk1, blk2|
-    fork_yld1_yld2.call blk1, lambda{ fork_yld1_yld2.call lambda{}, blk2 }
+    fork_yld1_yld2.call blk1, lambda{ fork_yld1_yld2.call lambda{0}, blk2 }
   }
 
   fork_yld1_yld2_wait = lambda{ |blk1, blk2|
