@@ -215,11 +215,11 @@ module HrrRbLxns
   end
 
   def self.do_setns nstype_file_h
-    nstype_file_h.each do |nstype, file|
+    nstype_file_h.map{ |nstype, file|
       File.open(file, File::RDONLY) do |f|
         __setns__ f.fileno, nstype
       end
-    end
+    }.max or 0
   end
 
   def self.get_nstype_file_h flags, pid, options
