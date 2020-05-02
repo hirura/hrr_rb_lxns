@@ -166,20 +166,19 @@ module HrrRbLxns
           io_w.write "1"
           io_w.close
           if pid_to_bind == Process.pid
-            _, status = Process.waitpid2 pid
-            raise Marshal.load(io_r.read) if status.exitstatus != 0
+            Process.waitpid pid
+            raise Marshal.load(io_r.read) unless $?.to_i.zero?
           end
           ret
         else
           begin
-            exit_status = true
             io_r.read 1
             bind_ns_files flags, options, pid_to_bind
           rescue Exception => e
-            exit_status = false
             io_w.write Marshal.dump(e)
-          ensure
-            exit! exit_status
+            exit! false
+          else
+            exit! true
           end
         end
       ensure
