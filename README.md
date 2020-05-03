@@ -23,7 +23,7 @@ Or install it yourself as:
 
 ## Usage
 
-hrr_rb_lxns provides unshare and setns wrappers.
+hrr_rb_lxns provides unshare and setns wrappers, and namespace files information collector.
 
 ### Unshare
 
@@ -108,6 +108,22 @@ HrrRbLxns.setns can associate namespaces using files which specify namespaces, i
 system "ip netns add ns0"
 # Then associate with the network namespace with specifying the file instead of pid.
 HrrRbLxns.setns HrrRbLxns::NETNET, nil, {network: "/run/netns/ns0"}
+```
+
+### Files
+
+HrrRbLxns.files Collects the caller process's or a specific process's namespace files information, which are the file path and its inode number.
+
+```ruby
+# Collects the caller process's namespace files information
+files = HrrRbLxns.files
+# Collects a specific process's namespace files information
+files = HrrRbLxns.files 12345
+
+# Then, paths and their inode numbers are accesible
+files.uts.path    # => "/proc/12345/ns/uts"
+files[:ipc].ino   # => 4026531839
+files["net"].ino  # => 4026531840
 ```
 
 ## Note

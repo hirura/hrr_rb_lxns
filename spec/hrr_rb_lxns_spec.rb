@@ -140,6 +140,56 @@ RSpec.describe HrrRbLxns do
   namespaces["cgroup"] = {short: "C", long: "NEWCGROUP", flag: HrrRbLxns::NEWCGROUP, key: :cgroup,  func1: fork_yld1_yld2,      func2: fork_yld1_yld2_wait     } if HrrRbLxns.const_defined? :NEWCGROUP
   namespaces["time"]   = {short: "T", long: "NEWTIME",   flag: HrrRbLxns::NEWTIME,   key: :time,    func1: fork_yld1_fork_yld2, func2: fork_yld1_fork_yld2_wait} if HrrRbLxns.const_defined? :NEWTIME
 
+
+  describe ".files" do
+    let(:keys){ [:mnt, :uts, :ipc, :net, :pid, :pid_for_children, :user, :cgroup, :time, :time_for_children] }
+
+    context "with no pid specified" do
+      let(:pid){ Process.pid }
+
+      it "returns the namespace files information of the current process" do
+        files = HrrRbLxns.files
+
+        keys.each do |key|
+          file = "/proc/#{pid}/ns/#{key}"
+          expect( files[key].path ).to eq file
+          expect( files[key].ino  ).to eq (File.exist?(file) ? File.stat(file).ino : nil)
+        end
+      end
+    end
+
+    context "with pid specified" do
+      context "which pid is the current process" do
+        let(:pid){ Process.pid }
+
+        it "returns the files of the current process" do
+          files = HrrRbLxns.files pid
+
+          keys.each do |key|
+            file = "/proc/#{pid}/ns/#{key}"
+            expect( files[key].path ).to eq file
+            expect( files[key].ino  ).to eq (File.exist?(file) ? File.stat(file).ino : nil)
+          end
+        end
+      end
+
+      context "which pid is not the current process" do
+        let(:pid){ Process.ppid }
+
+        it "returns the files of the process" do
+          files = HrrRbLxns.files pid
+
+          keys.each do |key|
+            file = "/proc/#{pid}/ns/#{key}"
+            expect( files[key].path ).to eq file
+            expect( files[key].ino  ).to eq (File.exist?(file) ? File.stat(file).ino : nil)
+          end
+        end
+      end
+    end
+  end
+
+
   describe ".unshare" do
     context "with no options" do
       0.upto(namespaces.size) do |n|
