@@ -1,5 +1,6 @@
 require "hrr_rb_lxns/version"
 require "hrr_rb_lxns/hrr_rb_lxns"
+require "hrr_rb_lxns/files"
 require "hrr_rb_mount"
 
 # Utilities working with Linux namespaces for CRuby.
@@ -7,6 +8,20 @@ module HrrRbLxns
 
   # Constants that represent the flags for Linux namespaces operations.
   module Constants
+  end
+
+  # Collects namespace files information in /proc/PID/ns/ directory of a process.
+  #
+  # @example
+  #   # Collects the caller process's or a specific process's namespace files information
+  #   files = HrrRbLxns.files
+  #   files = HrrRbLxns.files 12345
+  #   files.uts.path # => "/proc/12345/ns/uts"
+  #
+  # @param pid [Integer] The pid of a process to collect namespace files information. If nil, uses the caller process's pid.
+  # @return [HrrRbLxns::Files]
+  def self.files pid=nil
+    Files.new pid
   end
 
   # A wrapper around unshare(2) system call.
