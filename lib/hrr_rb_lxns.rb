@@ -18,9 +18,9 @@ module HrrRbLxns
   #   files = HrrRbLxns.files 12345
   #   files.uts.path # => "/proc/12345/ns/uts"
   #
-  # @param pid [Integer] The pid of a process to collect namespace files information. If nil, uses the caller process's pid.
+  # @param pid [Integer,String] The pid of a process to collect namespace files information. If nil, assumes that it is the caller process.
   # @return [HrrRbLxns::Files]
-  def self.files pid=nil
+  def self.files pid="self"
     Files.new pid
   end
 

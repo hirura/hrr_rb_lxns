@@ -74,10 +74,9 @@ module HrrRbLxns
     #
     attr_reader :time_for_children
 
-    # @param pid [Integer] The pid of a process to collect namespace files information. If nil, uses the caller process's pid.
+    # @param pid [Integer,String] The pid of a process to collect namespace files information. If nil, assumes that it is the caller process.
     #
-    def initialize pid=nil
-      pid ||= Process.pid
+    def initialize pid="self"
       @mnt               = File.new "/proc/#{pid}/ns/mnt"
       @uts               = File.new "/proc/#{pid}/ns/uts"
       @ipc               = File.new "/proc/#{pid}/ns/ipc"

@@ -4,7 +4,7 @@ RSpec.describe HrrRbLxns::Files do
   end
 
   context "with no pid specified" do
-    let(:pid){ Process.pid }
+    let(:pid){ "self" }
 
     it "returns the namespace files information of the current process" do
       files = described_class.new

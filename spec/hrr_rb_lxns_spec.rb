@@ -145,7 +145,7 @@ RSpec.describe HrrRbLxns do
     let(:keys){ [:mnt, :uts, :ipc, :net, :pid, :pid_for_children, :user, :cgroup, :time, :time_for_children] }
 
     context "with no pid specified" do
-      let(:pid){ Process.pid }
+      let(:pid){ "self" }
 
       it "returns the namespace files information of the current process" do
         files = HrrRbLxns.files
