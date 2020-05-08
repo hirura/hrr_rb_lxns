@@ -441,6 +441,44 @@ RSpec.describe HrrRbLxns do
           end
         end
       end
+
+      if namespaces.include?("time")
+        context "with monotonic/boottime options specified" do
+          [
+            {options: {},                                    expect: /^monotonic +0 +0\nboottime +0 +0\n$/      },
+            {options: {monotonic: 123},                      expect: /^monotonic +123 +0\nboottime +0 +0\n$/    },
+            {options: {boottime: "123.456"},                 expect: /^monotonic +0 +0\nboottime +123 +456000000\n$/  },
+            {options: {monotonic: "123.456", boottime: 123}, expect: /^monotonic +123 +456000000\nboottime +123 +0\n$/},
+          ].each do |spec|
+            context "when options are #{spec[:options].inspect}" do
+              targets = ["time"]
+              [
+                [targets.inject(""){|fs, t| fs + namespaces[t][:short]}, "#{targets.inject(""){|fs, t| fs + namespaces[t][:short]}.inspect}"       ],
+                [targets.inject(0 ){|fs, t| fs | namespaces[t][:flag ]}, "(#{targets.inject([]){|fs, t| fs + [namespaces[t][:long]]}.join(" | ")})"],
+              ].each do |flags, pretty_flags|
+                context "with #{pretty_flags} flags" do
+                  it "disassociates #{targets.inspect} namespaces and writes /proc/PID/timens_offsets" do
+                    options = spec[:options]
+                    before = HrrRbLxns.files
+                    begin
+                      pid_to_wait, (pid_target, after), pipe = fork_yld1_fork_yld2_wait.call lambda{ HrrRbLxns.unshare flags, options }, lambda{ HrrRbLxns.files }
+                      timens_offsets = File.read "/proc/#{pid_target}/timens_offsets"
+                    ensure
+                      pipe.close rescue nil
+                      Process.waitpid pid_to_wait
+                      raise RuntimeError, "forked process exited with non-zero status." unless $?.to_i.zero?
+                    end
+                    targets.each do |ns|
+                      expect( after[ns].ino ).not_to eq before[ns].ino
+                    end
+                    expect( timens_offsets ).to match spec[:expect]
+                  end
+                end
+              end
+            end
+          end
+        end
+      end
     end
   end
 
