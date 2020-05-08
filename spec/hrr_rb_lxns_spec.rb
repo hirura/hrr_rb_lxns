@@ -307,6 +307,140 @@ RSpec.describe HrrRbLxns do
           end
         end
       end
+
+      if (Gem.ruby_version < Gem::Version.create("2.6")).! && namespaces.include?("user")
+        context "with no map_uid/map_gid specified" do
+          targets = ["user"]
+          [
+            [targets.inject(""){|fs, t| fs + namespaces[t][:short]}, "#{targets.inject(""){|fs, t| fs + namespaces[t][:short]}.inspect}"       ],
+            [targets.inject(0 ){|fs, t| fs | namespaces[t][:flag ]}, "(#{targets.inject([]){|fs, t| fs + [namespaces[t][:long]]}.join(" | ")})"],
+          ].each do |flags, pretty_flags|
+            it "disassociates #{targets.inspect} namespaces and neither /proc/PID/uid_map nor /proc/PID/gid_map are created" do
+              before = HrrRbLxns.files
+              begin
+                pid_to_wait, (pid_target, after), pipe = fork_yld1_fork_yld2_wait.call lambda{ HrrRbLxns.unshare flags }, lambda{ HrrRbLxns.files }
+                uid_map_empty = File.empty? "/proc/#{pid_target}/uid_map"
+                gid_map_empty = File.empty? "/proc/#{pid_target}/gid_map"
+              ensure
+                pipe.close rescue nil
+                Process.waitpid pid_to_wait
+                raise RuntimeError, "forked process exited with non-zero status." unless $?.to_i.zero?
+              end
+              targets.each do |ns|
+                expect( after[ns].ino ).not_to eq before[ns].ino
+              end
+              expect( uid_map_empty ).to be true
+              expect( gid_map_empty ).to be true
+            end
+          end
+        end
+
+        context "with map_uid/map_gid specified" do
+          uid_maps = [
+            {option: "0 0 1",                             expect: /^\s*0\s+0\s+1\n$/},
+            {option: ["0 0 1", "1 10000 1000"],           expect: /^\s*0\s+0\s+1\n\s*1\s+10000\s+1000\n$/},
+            {option: [0, 0, 1],                           expect: /^\s*0\s+0\s+1\n$/},
+            {option: [[0, 0, 1], ["1", "10000", "1000"]], expect: /^\s*0\s+0\s+1\n\s*1\s+10000\s+1000\n$/},
+          ]
+          gid_maps = [
+            {option: "0 0 1",                             expect: /^\s*0\s+0\s+1\n$/},
+            {option: ["0 0 1", "1 10000 1000"],           expect: /^\s*0\s+0\s+1\n\s*1\s+10000\s+1000\n$/},
+            {option: [0, 0, 1],                           expect: /^\s*0\s+0\s+1\n$/},
+            {option: [[0, 0, 1], ["1", "10000", "1000"]], expect: /^\s*0\s+0\s+1\n\s*1\s+10000\s+1000\n$/},
+          ]
+
+          uid_maps.each do |uid_map|
+            context "when uid_map is #{uid_map[:option].inspect}" do
+              options = {map_uid: uid_map[:option]}
+              targets = ["user"]
+              [
+                [targets.inject(""){|fs, t| fs + namespaces[t][:short]}, "#{targets.inject(""){|fs, t| fs + namespaces[t][:short]}.inspect}"       ],
+                [targets.inject(0 ){|fs, t| fs | namespaces[t][:flag ]}, "(#{targets.inject([]){|fs, t| fs + [namespaces[t][:long]]}.join(" | ")})"],
+              ].each do |flags, pretty_flags|
+                it "disassociates #{targets.inspect} namespaces and writes /proc/PID/uid_map" do
+                  before = HrrRbLxns.files
+                  begin
+                    pid_to_wait, (pid_target, after), pipe = fork_yld1_fork_yld2_wait.call lambda{ HrrRbLxns.unshare flags, options }, lambda{ HrrRbLxns.files }
+                    uid_map_result   = File.read "/proc/#{pid_target}/uid_map"
+                    setgroups_result = File.read "/proc/#{pid_target}/setgroups"
+                    gid_map_result   = File.read "/proc/#{pid_target}/gid_map"
+                  ensure
+                    pipe.close rescue nil
+                    Process.waitpid pid_to_wait
+                    raise RuntimeError, "forked process exited with non-zero status." unless $?.to_i.zero?
+                  end
+                  targets.each do |ns|
+                    expect( after[ns].ino ).not_to eq before[ns].ino
+                  end
+                  expect( uid_map_result   ).to match uid_map[:expect]
+                  expect( setgroups_result ).to eq "allow\n"
+                  expect( gid_map_result   ).to eq ""
+                end
+              end
+            end
+          end
+
+          gid_maps.each do |gid_map|
+            context "when gid_map is #{gid_map[:option].inspect}" do
+              options = {map_gid: gid_map[:option]}
+              targets = ["user"]
+              [
+                [targets.inject(""){|fs, t| fs + namespaces[t][:short]}, "#{targets.inject(""){|fs, t| fs + namespaces[t][:short]}.inspect}"       ],
+                [targets.inject(0 ){|fs, t| fs | namespaces[t][:flag ]}, "(#{targets.inject([]){|fs, t| fs + [namespaces[t][:long]]}.join(" | ")})"],
+              ].each do |flags, pretty_flags|
+                it "disassociates #{targets.inspect} namespaces and writes /proc/PID/gid_map and writes deny in /proc/PID/setgroups" do
+                  before = HrrRbLxns.files
+                  begin
+                    pid_to_wait, (pid_target, after), pipe = fork_yld1_fork_yld2_wait.call lambda{ HrrRbLxns.unshare flags, options }, lambda{ HrrRbLxns.files }
+                    uid_map_result   = File.read "/proc/#{pid_target}/uid_map"
+                    setgroups_result = File.read "/proc/#{pid_target}/setgroups"
+                    gid_map_result   = File.read "/proc/#{pid_target}/gid_map"
+                  ensure
+                    pipe.close rescue nil
+                    Process.waitpid pid_to_wait
+                    raise RuntimeError, "forked process exited with non-zero status." unless $?.to_i.zero?
+                  end
+                  targets.each do |ns|
+                    expect( after[ns].ino ).not_to eq before[ns].ino
+                  end
+                  expect( uid_map_result   ).to eq ""
+                  expect( setgroups_result ).to eq "deny\n"
+                  expect( gid_map_result   ).to match gid_map[:expect]
+                end
+              end
+            end
+          end
+
+          context "when uid_map is #{uid_maps[0][:option].inspect} and gid_map is #{gid_maps[0][:option].inspect}" do
+            options = {map_uid: uid_maps[0][:option], map_gid: gid_maps[0][:option]}
+            targets = ["user"]
+            [
+              [targets.inject(""){|fs, t| fs + namespaces[t][:short]}, "#{targets.inject(""){|fs, t| fs + namespaces[t][:short]}.inspect}"       ],
+              [targets.inject(0 ){|fs, t| fs | namespaces[t][:flag ]}, "(#{targets.inject([]){|fs, t| fs + [namespaces[t][:long]]}.join(" | ")})"],
+            ].each do |flags, pretty_flags|
+              it "disassociates #{targets.inspect} namespaces and writes /proc/PID/uid_map and /proc/PID/gid_map and writes deny in /proc/PID/setgroups" do
+                before = HrrRbLxns.files
+                begin
+                  pid_to_wait, (pid_target, after), pipe = fork_yld1_fork_yld2_wait.call lambda{ HrrRbLxns.unshare flags, options }, lambda{ HrrRbLxns.files }
+                  uid_map_result   = File.read "/proc/#{pid_target}/uid_map"
+                  setgroups_result = File.read "/proc/#{pid_target}/setgroups"
+                  gid_map_result   = File.read "/proc/#{pid_target}/gid_map"
+                ensure
+                  pipe.close rescue nil
+                  Process.waitpid pid_to_wait
+                  raise RuntimeError, "forked process exited with non-zero status." unless $?.to_i.zero?
+                end
+                targets.each do |ns|
+                  expect( after[ns].ino ).not_to eq before[ns].ino
+                end
+                expect( uid_map_result   ).to match uid_maps[0][:expect]
+                expect( setgroups_result ).to eq "deny\n"
+                expect( gid_map_result   ).to match gid_maps[0][:expect]
+              end
+            end
+          end
+        end
+      end
     end
   end
 
