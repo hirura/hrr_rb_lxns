@@ -59,18 +59,23 @@ module HrrRbLxns
   # @option options [String] :cgroup  A persistent cgroup namespace to be created by bind mount.
   # @option options [String] :time    A persistent time namespace to be created by bind mount.
   # @option options [Boolean] :fork If specified, the caller process forks after unshare.
+  # @option options [String,Array<String>,Array<#to_i>,Array<Array<#to_i>>] :map_uid If specified, the caller process writes UID map in /proc/PID/uid_map.
+  # @option options [String,Array<String>,Array<#to_i>,Array<Array<#to_i>>] :map_gid If specified, the caller process writes deny in /proc/PID/setgroups and GID map in /proc/PID/gid_map.
   # @return [Integer, nil] Usually 0. If :fork is specified in options, then PID of the child process in parent, nil in child (as same as Kernel.#fork).
   # @raise [ArgumentError] When given flags argument is not appropriate.
+  # @raise [TypeError] When map_uid and/or map_gid value is not appropriate.
   # @raise [Errno::EXXX] In case unshare(2) system call failed.
   def self.unshare flags, options={}
     _flags = interpret_flags flags
     bind_ns_files_from_child(_flags, options) do
-      if fork? options
-        __unshare__ _flags
-        fork
-      else
-        __unshare__ _flags
+      ret = nil
+      map_uid_gid_from_child(_flags, options) do
+        ret = __unshare__ _flags
       end
+      if fork?(options)
+        ret = fork
+      end
+      ret
     end
   end
 
@@ -226,6 +231,85 @@ module HrrRbLxns
       if (flags & flag).zero?.! && options[key]
         HrrRbMount.bind "/proc/#{pid}/ns/#{name}", options[key]
       end
+    end
+  end
+
+  def self.map_uid_gid? flags, options
+    const_defined?(:NEWUSER) && (flags & NEWUSER).zero?.! && (options.has_key?(:map_uid) || options.has_key?(:map_gid))
+  end
+
+  # This method calls fork and the child process writes into /proc/PID/uid_map, /proc/PID/gid_map, and /proc/PID/setgroups.
+  def self.map_uid_gid_from_child flags, options
+    if map_uid_gid? flags, options
+      pid_to_map = Process.pid
+      IO.pipe do |io_r, io_w|
+        if pid = fork
+          begin
+            ret = yield
+          rescue Exception
+            Process.kill "KILL", pid
+            Process.waitpid pid
+            raise
+          else
+            io_w.write "1"
+            io_w.close
+            Process.waitpid pid
+            raise Marshal.load(io_r.read) unless $?.to_i.zero?
+            ret
+          end
+        else
+          begin
+            io_r.read 1
+            map_uid_gid options, pid_to_map
+          rescue Exception => e
+            io_w.write Marshal.dump(e)
+            exit! false
+          else
+            exit! true
+          end
+        end
+      end
+    else
+      yield
+    end
+  end
+
+  def self.map_uid_gid options, pid
+    if options.has_key?(:map_uid)
+      write_id_map options[:map_uid], pid, "uid"
+    end
+    if options.has_key?(:map_gid)
+      deny_setgroups pid
+      write_id_map options[:map_gid], pid, "gid"
+    end
+  end
+
+  def self.write_id_map mapping, pid, type
+    path = "/proc/#{pid}/#{type}_map"
+    _mapping = case mapping
+               when String # "0 0 1", "0 0 1\n1 10000 1000\n"
+                 mapping.chomp
+               when Array
+                 if mapping.all?{|e| e.respond_to?(:match?) && e.match?(/^\d+ \d+ \d+$/)} # ["0 0 1", "1 10000 1000"]
+                   mapping.join("\n")
+                 elsif mapping.all?{|e| e.respond_to?(:to_i)} # [0, 0, 1], ["0", "0", "1"]
+                   mapping.map(&:to_i).join(" ")
+                 elsif mapping.all?{|e| e.respond_to?(:all?) && e.all?{ |e2| e2.respond_to?(:to_i)}} # [[0, 0, 1], ["1", "10000", "1000"]]
+                   mapping.map{|e| e.map(&:to_i).join(" ")}.join("\n")
+                 else
+                   raise TypeError, "map_#{type}"
+                 end
+               else
+                 raise TypeError, "map_#{type}"
+               end
+    File.open(path, "w") do |f|
+      f.puts _mapping
+    end
+  end
+
+  def self.deny_setgroups pid
+    File.open("/proc/#{pid}/setgroups", "w") do |f|
+      f.puts "deny"
     end
   end
 
