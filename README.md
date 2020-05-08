@@ -92,6 +92,14 @@ File.read("/proc/self/setgroups")                     # => "deny\n"
 File.read("/proc/self/gid_map").gsub(/ +/, " ")       # => " 0 0 1\n"
 ```
 
+Time namespace provides per-namespace monotonic and boottime clocks. The clock offsets can be set by `:monotonic` and `:boottime` options.
+
+```ruby
+options = {:monotonic => 123.456, :boottime => "123.456"}
+HrrRbLxns.unshare HrrRbLxns::NEWTIME, options          # => 0
+File.read("/proc/self/timens_offsets").gsub(/ +/, " ") # => "monotonic 123 456000000\nboottime 123 456000000\n"
+```
+
 ### Setns
 
 HrrRbLxns.setns method wraps around setns(2) system call. The system call associate the caller process's namespace to an existing one, which is disassociated by some other process.

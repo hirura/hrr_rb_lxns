@@ -2,6 +2,7 @@
 #define _GNU_SOURCE 1
 #include <sched.h>
 #include <linux/version.h>
+#include <time.h>
 
 VALUE rb_mHrrRbLxns;
 VALUE rb_mHrrRbLxnsConst;
@@ -116,5 +117,13 @@ Init_hrr_rb_lxns(void)
 #ifdef CLONE_NEWTIME
   /* Represents time namespace. */
   rb_define_const(rb_mHrrRbLxnsConst, "NEWTIME", INT2FIX(CLONE_NEWTIME));
+#endif
+#ifdef CLOCK_MONOTONIC
+  /* Represents monotonic clock. */
+  rb_define_const(rb_mHrrRbLxnsConst, "MONOTONIC", INT2FIX(CLOCK_MONOTONIC));
+#endif
+#ifdef CLOCK_BOOTTIME
+  /* Represents boottime clock. */
+  rb_define_const(rb_mHrrRbLxnsConst, "BOOTTIME", INT2FIX(CLOCK_BOOTTIME));
 #endif
 }

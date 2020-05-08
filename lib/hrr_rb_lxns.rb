@@ -61,6 +61,8 @@ module HrrRbLxns
   # @option options [Boolean] :fork If specified, the caller process forks after unshare.
   # @option options [String,Array<String>,Array<#to_i>,Array<Array<#to_i>>] :map_uid If specified, the caller process writes UID map in /proc/PID/uid_map.
   # @option options [String,Array<String>,Array<#to_i>,Array<Array<#to_i>>] :map_gid If specified, the caller process writes deny in /proc/PID/setgroups and GID map in /proc/PID/gid_map.
+  # @option options [Numeric,String] :monotonic If specified, writes monotonic offset in /proc/PID/timens_offsets.
+  # @option options [Numeric,String] :boottime If specified, writes boottime offset in /proc/PID/timens_offsets.
   # @return [Integer, nil] Usually 0. If :fork is specified in options, then PID of the child process in parent, nil in child (as same as Kernel.#fork).
   # @raise [ArgumentError] When given flags argument is not appropriate.
   # @raise [TypeError] When map_uid and/or map_gid value is not appropriate.
@@ -71,6 +73,7 @@ module HrrRbLxns
       ret = nil
       map_uid_gid_from_child(_flags, options) do
         ret = __unshare__ _flags
+        set_timens_offsets(_flags, options)
       end
       if fork?(options)
         ret = fork
@@ -310,6 +313,27 @@ module HrrRbLxns
   def self.deny_setgroups pid
     File.open("/proc/#{pid}/setgroups", "w") do |f|
       f.puts "deny"
+    end
+  end
+
+  def self.set_timens_offsets? flags, options
+    const_defined?(:NEWTIME) && (flags & NEWTIME).zero?.! && (options.has_key?(:monotonic) || options.has_key?(:boottime))
+  end
+
+  def self.set_timens_offsets(flags, options)
+    if set_timens_offsets? flags, options
+      File.open("/proc/self/timens_offsets", "w") do |f|
+        [
+          [MONOTONIC, :monotonic],
+          [BOOTTIME,  :boottime ],
+        ].each do |clk_id, key|
+          if options.has_key? key
+            offset_secs     = options[key].to_i
+            offset_nanosecs = ((Rational(options[key]) - offset_secs) * 10**9).to_i
+            f.puts "#{clk_id} #{offset_secs} #{offset_nanosecs}"
+          end
+        end
+      end
     end
   end
 
