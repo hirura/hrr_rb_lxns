@@ -78,6 +78,20 @@ else
 end
 ```
 
+HrrRbLxns.unshare also supports mapping UIDs and/or GIDs for user namespace. When `:map_gid` option is specified, the method also writes `deny\n` in /proc/PID/setgroups.
+
+```ruby
+options = {:map_uid => [[0, 0, 1], [1, 10000, 1000]]}
+HrrRbLxns.unshare HrrRbLxns::NEWUSER, options         # => 0
+File.read("/proc/self/uid_map").gsub(/ +/, " ")       # => " 0 0 1\n 1 10000 1000\n"
+
+options = {:map_uid => "0 0 1", :map_gid => "0 0 1"}
+HrrRbLxns.unshare HrrRbLxns::NEWUSER, options         # => 0
+File.read("/proc/self/uid_map").gsub(/ +/, " ")       # => " 0 0 1\n"
+File.read("/proc/self/setgroups")                     # => "deny\n"
+File.read("/proc/self/gid_map").gsub(/ +/, " ")       # => " 0 0 1\n"
+```
+
 ### Setns
 
 HrrRbLxns.setns method wraps around setns(2) system call. The system call associate the caller process's namespace to an existing one, which is disassociated by some other process.
