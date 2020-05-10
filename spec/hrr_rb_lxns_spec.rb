@@ -593,15 +593,15 @@ RSpec.describe HrrRbLxns do
 
     unless (Gem.ruby_version < Gem::Version.create("2.6"))
       context "as not root user" do
-        nobody_uid = Etc.getpwnam("nobody").uid
-        nobody_gid = Etc.getgrnam("nobody").gid
+        login_uid = Etc.getpwnam(Etc.getlogin).uid
+        login_gid = Etc.getgrnam(Etc.getlogin).gid
 
         before :example do
           @tmpdir = Dir.mktmpdir
           HrrRbMount.bind @tmpdir, @tmpdir
           HrrRbMount.make_private @tmpdir
           @persist_files = Hash[namespaces.keys.map{|ns| [ns, Tempfile.new(ns, @tmpdir)]}]
-          FileUtils.chown_R nobody_uid, nobody_gid, @tmpdir
+          FileUtils.chown_R login_uid, login_gid, @tmpdir
         end
 
         after :example do
@@ -622,11 +622,11 @@ RSpec.describe HrrRbLxns do
            it "associates #{targets.inspect} namespaces" do
              before = HrrRbLxns.files
              begin
-               chpr = lambda{ Process::GID.change_privilege(nobody_gid); Process::UID.change_privilege(nobody_uid) }
+               chpr = lambda{ Process::GID.change_privilege(login_gid); Process::UID.change_privilege(login_uid) }
                pid_to_wait, (pid_target, target), pipe = fork_yld1_fork_yld2_wait.call lambda{ chpr.call; HrrRbLxns.unshare flags }, lambda{ HrrRbLxns.files }
-               File.open("/proc/#{pid_to_wait}/uid_map",   "w"){ |f| f.puts "0 #{nobody_uid} 1" }
+               File.open("/proc/#{pid_to_wait}/uid_map",   "w"){ |f| f.puts "0 #{login_uid} 1" }
                File.open("/proc/#{pid_to_wait}/setgroups", "w"){ |f| f.puts "deny"              }
-               File.open("/proc/#{pid_to_wait}/gid_map",   "w"){ |f| f.puts "0 #{nobody_gid} 1" }
+               File.open("/proc/#{pid_to_wait}/gid_map",   "w"){ |f| f.puts "0 #{login_gid} 1" }
                namespaces.each{|k,v| HrrRbMount.bind "/proc/#{pid_target}/ns/#{k}", @persist_files[k].path}
                setns_options = Hash[namespaces.map{|k,v| [v[:key], @persist_files[k].path]}]
                after = fork_yld1_fork_yld2.call lambda{ chpr.call; HrrRbLxns.setns flags, pid_target, setns_options }, lambda{ HrrRbLxns.files }
