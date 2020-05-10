@@ -1,3 +1,4 @@
+require "etc"
 require "tmpdir"
 require "tempfile"
 require "fileutils"
@@ -199,8 +200,8 @@ RSpec.describe HrrRbLxns do
       end
 
       context "when invalid value" do
-        it "raises SystemCallError" do
-          expect{ fork_yld.call lambda{ HrrRbLxns.unshare -1 } }.to raise_error SystemCallError
+        it "raises ArgumentError" do
+          expect{ fork_yld.call lambda{ HrrRbLxns.unshare -1 } }.to raise_error ArgumentError
         end
       end
     end
@@ -491,8 +492,8 @@ RSpec.describe HrrRbLxns do
       end
 
       context "when invalid value" do
-        it "raises SystemCallError" do
-          expect{ fork_yld.call lambda{ HrrRbLxns.setns -1, Process.pid } }.to raise_error SystemCallError
+        it "raises ArgumentError" do
+          expect{ fork_yld.call lambda{ HrrRbLxns.setns -1, Process.pid } }.to raise_error ArgumentError
         end
       end
     end
@@ -586,6 +587,60 @@ RSpec.describe HrrRbLxns do
               end
             end
           end
+        end
+      end
+    end
+
+    unless (Gem.ruby_version < Gem::Version.create("2.6"))
+      context "as not root user" do
+        nobody_uid = Etc.getpwnam("nobody").uid
+        nobody_gid = Etc.getgrnam("nobody").gid
+
+        before :example do
+          @tmpdir = Dir.mktmpdir
+          HrrRbMount.bind @tmpdir, @tmpdir
+          HrrRbMount.make_private @tmpdir
+          @persist_files = Hash[namespaces.keys.map{|ns| [ns, Tempfile.new(ns, @tmpdir)]}]
+          FileUtils.chown_R nobody_uid, nobody_gid, @tmpdir
+        end
+
+        after :example do
+          @persist_files.values.each do |tmpfile|
+            nil while system "mountpoint -q #{tmpfile.path} && umount #{tmpfile.path}"
+            tmpfile.close!
+          end
+          nil while system "mountpoint -q #{@tmpdir} && umount #{@tmpdir}"
+          FileUtils.remove_entry_secure @tmpdir
+        end
+
+        targets = namespaces.keys
+        [
+          [targets.inject(""){|fs, t| fs + namespaces[t][:short]}, "#{targets.inject(""){|fs, t| fs + namespaces[t][:short]}.inspect}"       ],
+          [targets.inject(0 ){|fs, t| fs | namespaces[t][:flag ]}, "(#{targets.inject([]){|fs, t| fs + [namespaces[t][:long]]}.join(" | ")})"],
+        ].each do |flags, pretty_flags|
+          context "with #{pretty_flags} flags" do
+           it "associates #{targets.inspect} namespaces" do
+             before = HrrRbLxns.files
+             begin
+               chpr = lambda{ Process::GID.change_privilege(nobody_gid); Process::UID.change_privilege(nobody_uid) }
+               pid_to_wait, (pid_target, target), pipe = fork_yld1_fork_yld2_wait.call lambda{ chpr.call; HrrRbLxns.unshare flags }, lambda{ HrrRbLxns.files }
+               File.open("/proc/#{pid_to_wait}/uid_map",   "w"){ |f| f.puts "0 #{nobody_uid} 1" }
+               File.open("/proc/#{pid_to_wait}/setgroups", "w"){ |f| f.puts "deny"              }
+               File.open("/proc/#{pid_to_wait}/gid_map",   "w"){ |f| f.puts "0 #{nobody_gid} 1" }
+               namespaces.each{|k,v| HrrRbMount.bind "/proc/#{pid_target}/ns/#{k}", @persist_files[k].path}
+               setns_options = Hash[namespaces.map{|k,v| [v[:key], @persist_files[k].path]}]
+               after = fork_yld1_fork_yld2.call lambda{ chpr.call; HrrRbLxns.setns flags, pid_target, setns_options }, lambda{ HrrRbLxns.files }
+             ensure
+               pipe.close rescue nil
+               Process.waitpid pid_to_wait
+               raise RuntimeError, "forked process exited with non-zero status." unless $?.to_i.zero?
+             end
+             targets.each do |ns|
+               expect( after[ns].ino ).not_to eq before[ns].ino
+               expect( after[ns].ino ).to eq target[ns].ino
+             end
+           end
+         end
         end
       end
     end
