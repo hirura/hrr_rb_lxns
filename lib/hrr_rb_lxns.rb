@@ -132,15 +132,35 @@ module HrrRbLxns
     _flags = interpret_flags flags
     nstype_file_h = get_nstype_file_h _flags, pid, options
     do_setns nstype_file_h
+    return 0
   end
 
   private
 
   def self.interpret_flags arg
     case arg
-    when Integer then arg
-    when String  then chars_to_flags arg
-    else raise TypeError, "unsupported flags: #{arg.inspect}"
+    when Integer
+      check_flags arg
+      arg
+    when String
+      chars_to_flags arg
+    else
+      raise TypeError, "unsupported flags: #{arg.inspect}"
+    end
+  end
+
+  def self.check_flags flags
+    valid_flags = 0
+    valid_flags += NEWIPC    if const_defined?(:NEWIPC)
+    valid_flags += NEWNS     if const_defined?(:NEWNS)
+    valid_flags += NEWNET    if const_defined?(:NEWNET)
+    valid_flags += NEWPID    if const_defined?(:NEWPID)
+    valid_flags += NEWUTS    if const_defined?(:NEWUTS)
+    valid_flags += NEWUSER   if const_defined?(:NEWUSER)
+    valid_flags += NEWCGROUP if const_defined?(:NEWCGROUP)
+    valid_flags += NEWTIME   if const_defined?(:NEWTIME)
+    unless (flags - (flags & valid_flags)).zero?
+      raise ArgumentError, "unsupported flags are set"
     end
   end
 
@@ -338,14 +358,27 @@ module HrrRbLxns
   end
 
   def self.do_setns nstype_file_h
+    list_without_user = nstype_file_h.keys - [NEWUSER]
+    success = {}
+    error = {}
     nstype_fileobj_h = {}
     begin
       nstype_file_h.each do |nstype, file|
         nstype_fileobj_h[nstype] = File.open(file, File::RDONLY)
       end
-      nstype_fileobj_h.map{ |nstype, fileobj|
-        __setns__ fileobj.fileno, nstype
-      }.max or 0
+      (list_without_user + [NEWUSER] + list_without_user).each do |nstype|
+        next unless nstype_file_h.has_key? nstype
+        begin
+          next if success.has_key? nstype
+          fileobj = nstype_fileobj_h[nstype]
+          __setns__ fileobj.fileno, nstype
+        rescue
+          raise if error.has_key? nstype
+          error[nstype] = true
+        else
+          success[nstype] = true
+        end
+      end
     ensure
       nstype_fileobj_h.each do |nstype, fileobj|
         fileobj.close
