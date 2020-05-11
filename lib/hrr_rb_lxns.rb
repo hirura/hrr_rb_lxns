@@ -10,6 +10,17 @@ module HrrRbLxns
   module Constants
   end
 
+  @@namespaces = Hash.new
+  @@namespaces["mnt"]    = {char: "m", flag: NEWNS,     key: :mount,   file_to_bind: "mnt",               file_to_open: "mnt"   }.freeze if const_defined? :NEWNS
+  @@namespaces["uts"]    = {char: "u", flag: NEWUTS,    key: :uts,     file_to_bind: "uts",               file_to_open: "uts"   }.freeze if const_defined? :NEWUTS
+  @@namespaces["ipc"]    = {char: "i", flag: NEWIPC,    key: :ipc,     file_to_bind: "ipc",               file_to_open: "ipc"   }.freeze if const_defined? :NEWIPC
+  @@namespaces["net"]    = {char: "n", flag: NEWNET,    key: :network, file_to_bind: "net",               file_to_open: "net"   }.freeze if const_defined? :NEWNET
+  @@namespaces["pid"]    = {char: "p", flag: NEWPID,    key: :pid,     file_to_bind: "pid_for_children",  file_to_open: "pid"   }.freeze if const_defined? :NEWPID
+  @@namespaces["user"]   = {char: "U", flag: NEWUSER,   key: :user,    file_to_bind: "user",              file_to_open: "user"  }.freeze if const_defined? :NEWUSER
+  @@namespaces["cgroup"] = {char: "C", flag: NEWCGROUP, key: :cgroup,  file_to_bind: "cgroup",            file_to_open: "cgroup"}.freeze if const_defined? :NEWCGROUP
+  @@namespaces["time"]   = {char: "T", flag: NEWTIME,   key: :time,    file_to_bind: "time_for_children", file_to_open: "time"  }.freeze if const_defined? :NEWTIME
+  @@namespaces.freeze
+
   # Collects namespace files information in /proc/PID/ns/ directory of a process.
   #
   # @example
@@ -137,6 +148,10 @@ module HrrRbLxns
 
   private
 
+  def self.namespaces
+    @@namespaces
+  end
+
   def self.interpret_flags arg
     case arg
     when Integer
@@ -150,33 +165,17 @@ module HrrRbLxns
   end
 
   def self.check_flags flags
-    valid_flags = 0
-    valid_flags += NEWIPC    if const_defined?(:NEWIPC)
-    valid_flags += NEWNS     if const_defined?(:NEWNS)
-    valid_flags += NEWNET    if const_defined?(:NEWNET)
-    valid_flags += NEWPID    if const_defined?(:NEWPID)
-    valid_flags += NEWUTS    if const_defined?(:NEWUTS)
-    valid_flags += NEWUSER   if const_defined?(:NEWUSER)
-    valid_flags += NEWCGROUP if const_defined?(:NEWCGROUP)
-    valid_flags += NEWTIME   if const_defined?(:NEWTIME)
-    unless (flags - (flags & valid_flags)).zero?
+    unless (flags - (flags & namespaces.map{|_,v| v[:flag]}.sum)).zero?
       raise ArgumentError, "unsupported flags are set"
     end
   end
 
   def self.chars_to_flags chars
-    chars.each_char.inject(0) do |f, c|
-      if    c == "i" && const_defined?(:NEWIPC)    then f | NEWIPC
-      elsif c == "m" && const_defined?(:NEWNS)     then f | NEWNS
-      elsif c == "n" && const_defined?(:NEWNET)    then f | NEWNET
-      elsif c == "p" && const_defined?(:NEWPID)    then f | NEWPID
-      elsif c == "u" && const_defined?(:NEWUTS)    then f | NEWUTS
-      elsif c == "U" && const_defined?(:NEWUSER)   then f | NEWUSER
-      elsif c == "C" && const_defined?(:NEWCGROUP) then f | NEWCGROUP
-      elsif c == "T" && const_defined?(:NEWTIME)   then f | NEWTIME
-      else raise ArgumentError, "unsupported flag charactor: #{c.inspect}"
-      end
+    invalid_chars = chars.chars - namespaces.map{|_,v| v[:char]}
+    unless invalid_chars.empty?
+      raise ArgumentError, "unsupported flag charactor: #{invalid_chars.inspect}"
     end
+    namespaces.select{|_,v| chars.include?(v[:char])}.map{|_,v| v[:flag]}.inject(0){|lsum,flag| lsum | flag}
   end
 
   def self.fork? options
@@ -184,16 +183,7 @@ module HrrRbLxns
   end
 
   def self.bind_ns_files? options
-    list = Array.new
-    list.push :ipc     if const_defined?(:NEWIPC)
-    list.push :mount   if const_defined?(:NEWNS)
-    list.push :network if const_defined?(:NEWNET)
-    list.push :pid     if const_defined?(:NEWPID)
-    list.push :uts     if const_defined?(:NEWUTS)
-    list.push :user    if const_defined?(:NEWUSER)
-    list.push :cgroup  if const_defined?(:NEWCGROUP)
-    list.push :time    if const_defined?(:NEWTIME)
-    (list & options.keys).empty?.!
+    (namespaces.map{|_,v| v[:key]} & options.keys).empty?.!
   end
 
   # In some cases, namespace files need to be created by an external process.
@@ -241,16 +231,7 @@ module HrrRbLxns
   end
 
   def self.bind_ns_files flags, options, pid
-    list = Array.new
-    list.push ["ipc",               NEWIPC,    :ipc    ] if const_defined?(:NEWIPC)
-    list.push ["mnt",               NEWNS,     :mount  ] if const_defined?(:NEWNS)
-    list.push ["net",               NEWNET,    :network] if const_defined?(:NEWNET)
-    list.push ["pid_for_children",  NEWPID,    :pid    ] if const_defined?(:NEWPID)
-    list.push ["uts",               NEWUTS,    :uts    ] if const_defined?(:NEWUTS)
-    list.push ["user",              NEWUSER,   :user   ] if const_defined?(:NEWUSER)
-    list.push ["cgroup",            NEWCGROUP, :cgroup ] if const_defined?(:NEWCGROUP)
-    list.push ["time_for_children", NEWTIME,   :time   ] if const_defined?(:NEWTIME)
-    list.each do |name, flag, key|
+    namespaces.map{|_,v| [v[:file_to_bind], v[:flag], v[:key]]}.each do |name, flag, key|
       if (flags & flag).zero?.! && options[key]
         HrrRbMount.bind "/proc/#{pid}/ns/#{name}", options[key]
       end
@@ -258,7 +239,7 @@ module HrrRbLxns
   end
 
   def self.map_uid_gid? flags, options
-    const_defined?(:NEWUSER) && (flags & NEWUSER).zero?.! && (options.has_key?(:map_uid) || options.has_key?(:map_gid))
+    (flags & namespaces.fetch("user", {}).fetch(:flag, 0)).zero?.! && (options.has_key?(:map_uid) || options.has_key?(:map_gid))
   end
 
   # This method calls fork and the child process writes into /proc/PID/uid_map, /proc/PID/gid_map, and /proc/PID/setgroups.
@@ -337,7 +318,7 @@ module HrrRbLxns
   end
 
   def self.set_timens_offsets? flags, options
-    const_defined?(:NEWTIME) && (flags & NEWTIME).zero?.! && (options.has_key?(:monotonic) || options.has_key?(:boottime))
+    (flags & namespaces.fetch("time", {}).fetch(:flag, 0)).zero?.! && (options.has_key?(:monotonic) || options.has_key?(:boottime))
   end
 
   def self.set_timens_offsets(flags, options)
@@ -387,17 +368,8 @@ module HrrRbLxns
   end
 
   def self.get_nstype_file_h flags, pid, options
-    list = Array.new
-    list.push ["ipc",    NEWIPC,    :ipc    ] if const_defined?(:NEWIPC)
-    list.push ["mnt",    NEWNS,     :mount  ] if const_defined?(:NEWNS)
-    list.push ["net",    NEWNET,    :network] if const_defined?(:NEWNET)
-    list.push ["pid",    NEWPID,    :pid    ] if const_defined?(:NEWPID)
-    list.push ["uts",    NEWUTS,    :uts    ] if const_defined?(:NEWUTS)
-    list.push ["user",   NEWUSER,   :user   ] if const_defined?(:NEWUSER)
-    list.push ["cgroup", NEWCGROUP, :cgroup ] if const_defined?(:NEWCGROUP)
-    list.push ["time",   NEWTIME,   :time   ] if const_defined?(:NEWTIME)
     nstype_file_h = Hash.new
-    list.each do |name, flag, key|
+    namespaces.map{|_,v| [v[:file_to_open], v[:flag], v[:key]]}.each do |name, flag, key|
       file = get_file name, (flags & flag), pid, key, options[key]
       nstype_file_h[flag] = file if file
     end
