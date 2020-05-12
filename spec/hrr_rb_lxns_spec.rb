@@ -591,7 +591,7 @@ RSpec.describe HrrRbLxns do
       end
     end
 
-    unless (Gem.ruby_version < Gem::Version.create("2.6"))
+    if namespaces.has_key?("user") && ! (Gem.ruby_version < Gem::Version.create("2.6"))
       context "as not root user" do
         login_uid = Etc.getpwnam(Etc.getlogin).uid
         login_gid = Etc.getgrnam(Etc.getlogin).gid
