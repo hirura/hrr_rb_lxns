@@ -165,7 +165,7 @@ module HrrRbLxns
   end
 
   def self.check_flags flags
-    unless (flags - (flags & namespaces.map{|_,v| v[:flag]}.sum)).zero?
+    unless (flags - (flags & namespaces.map{|_,v| v[:flag]}.inject(:+))).zero?
       raise ArgumentError, "unsupported flags are set"
     end
   end
