@@ -191,18 +191,35 @@ module HrrRbLxns
   def self.bind_ns_files_from_child flags, options
     if bind_ns_files? options
       pid_to_bind = Process.pid
-      pid = nil
-      begin
-        io_r, io_w = IO.pipe
+      IO.pipe do |io_r, io_w|
         if pid = fork
-          ret = yield
-          io_w.write "1"
-          io_w.close
-          if pid_to_bind == Process.pid
+          begin
+            ret = yield
+          rescue Exception
+            Process.kill "KILL", pid
             Process.waitpid pid
-            raise Marshal.load(io_r.read) unless $?.to_i.zero?
+            raise
+          else
+            IO.pipe do |io2_r, io2_w|
+              if ret
+                io_w.write "1"
+                io_w.close
+                Process.waitpid pid
+                unless $?.to_i.zero?
+                  if ret > 0
+                    Process.kill "KILL", ret
+                    Process.waitpid ret
+                  end
+                  raise Marshal.load(io_r.read) unless $?.to_i.zero?
+                end
+              else
+                io_w.close
+                io2_w.close
+                io2_r.read
+              end
+            end
+            ret
           end
-          ret
         else
           begin
             io_r.read 1
@@ -212,16 +229,6 @@ module HrrRbLxns
             exit! false
           else
             exit! true
-          end
-        end
-      ensure
-        io_w.write "1" rescue nil # just in case getting an error before io_w.write
-        io_w.close     rescue nil
-        io_r.close     rescue nil
-        if pid_to_bind == Process.pid
-          begin
-            Process.waitpid pid
-          rescue Errno::ECHILD
           end
         end
       end
