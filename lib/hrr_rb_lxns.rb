@@ -11,14 +11,14 @@ module HrrRbLxns
   end
 
   @@namespaces = Hash.new
-  @@namespaces["mnt"]    = {char: "m", flag: NEWNS,     key: :mount,   file_to_bind: "mnt",               file_to_open: "mnt"   }.freeze if const_defined? :NEWNS
-  @@namespaces["uts"]    = {char: "u", flag: NEWUTS,    key: :uts,     file_to_bind: "uts",               file_to_open: "uts"   }.freeze if const_defined? :NEWUTS
-  @@namespaces["ipc"]    = {char: "i", flag: NEWIPC,    key: :ipc,     file_to_bind: "ipc",               file_to_open: "ipc"   }.freeze if const_defined? :NEWIPC
-  @@namespaces["net"]    = {char: "n", flag: NEWNET,    key: :network, file_to_bind: "net",               file_to_open: "net"   }.freeze if const_defined? :NEWNET
-  @@namespaces["pid"]    = {char: "p", flag: NEWPID,    key: :pid,     file_to_bind: "pid_for_children",  file_to_open: "pid"   }.freeze if const_defined? :NEWPID
-  @@namespaces["user"]   = {char: "U", flag: NEWUSER,   key: :user,    file_to_bind: "user",              file_to_open: "user"  }.freeze if const_defined? :NEWUSER
-  @@namespaces["cgroup"] = {char: "C", flag: NEWCGROUP, key: :cgroup,  file_to_bind: "cgroup",            file_to_open: "cgroup"}.freeze if const_defined? :NEWCGROUP
-  @@namespaces["time"]   = {char: "T", flag: NEWTIME,   key: :time,    file_to_bind: "time_for_children", file_to_open: "time"  }.freeze if const_defined? :NEWTIME
+  @@namespaces["mnt"]    = {char: "m", flag: NEWNS,     key: :mount,   file_to_bind: "mnt"              }.freeze if const_defined? :NEWNS
+  @@namespaces["uts"]    = {char: "u", flag: NEWUTS,    key: :uts,     file_to_bind: "uts"              }.freeze if const_defined? :NEWUTS
+  @@namespaces["ipc"]    = {char: "i", flag: NEWIPC,    key: :ipc,     file_to_bind: "ipc"              }.freeze if const_defined? :NEWIPC
+  @@namespaces["net"]    = {char: "n", flag: NEWNET,    key: :network, file_to_bind: "net"              }.freeze if const_defined? :NEWNET
+  @@namespaces["pid"]    = {char: "p", flag: NEWPID,    key: :pid,     file_to_bind: "pid_for_children" }.freeze if const_defined? :NEWPID
+  @@namespaces["user"]   = {char: "U", flag: NEWUSER,   key: :user,    file_to_bind: "user"             }.freeze if const_defined? :NEWUSER
+  @@namespaces["cgroup"] = {char: "C", flag: NEWCGROUP, key: :cgroup,  file_to_bind: "cgroup"           }.freeze if const_defined? :NEWCGROUP
+  @@namespaces["time"]   = {char: "T", flag: NEWTIME,   key: :time,    file_to_bind: "time_for_children"}.freeze if const_defined? :NEWTIME
   @@namespaces.freeze
 
   # Collects namespace files information in /proc/PID/ns/ directory of a process.
@@ -376,7 +376,7 @@ module HrrRbLxns
 
   def self.get_nstype_file_h flags, pid, options
     nstype_file_h = Hash.new
-    namespaces.map{|_,v| [v[:file_to_open], v[:flag], v[:key]]}.each do |name, flag, key|
+    namespaces.map{|k,v| [k, v[:flag], v[:key]]}.each do |name, flag, key|
       file = get_file name, (flags & flag), pid, key, options[key]
       nstype_file_h[flag] = file if file
     end
