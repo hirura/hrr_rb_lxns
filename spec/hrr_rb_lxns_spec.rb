@@ -211,8 +211,8 @@ RSpec.describe HrrRbLxns do
         namespaces.keys.combination(n).each do |targets|
           others  = namespaces.keys - targets
           [
-            [targets.inject(""){|fs, t| fs + namespaces[t][:short]}, "#{targets.inject(""){|fs, t| fs + namespaces[t][:short]}.inspect}"       ],
-            [targets.inject(0 ){|fs, t| fs | namespaces[t][:flag ]}, "(#{targets.inject([]){|fs, t| fs + [namespaces[t][:long]]}.join(" | ")})"],
+            [targets.map{|ns| namespaces[ns][:short]}.join(""), "#{targets.map{|ns| namespaces[ns][:short]}.join("").inspect}"],
+            [targets.map{|ns| namespaces[ns][:flag]}.inject(0, :|), "(#{targets.map{|ns| namespaces[ns][:long]}.join(" | ")})"],
           ].each do |flags, pretty_flags|
             context "with #{pretty_flags} flags" do
               if (Gem.ruby_version < Gem::Version.create("2.3")) && targets.include?("pid")
@@ -261,8 +261,8 @@ RSpec.describe HrrRbLxns do
           namespaces.keys.combination(n).each do |targets|
             others  = namespaces.keys - targets
             [
-              [targets.inject(""){|fs, t| fs + namespaces[t][:short]}, "#{targets.inject(""){|fs, t| fs + namespaces[t][:short]}.inspect}"       ],
-              [targets.inject(0 ){|fs, t| fs | namespaces[t][:flag ]}, "(#{targets.inject([]){|fs, t| fs + [namespaces[t][:long]]}.join(" | ")})"],
+              [targets.map{|ns| namespaces[ns][:short]}.join(""), "#{targets.map{|ns| namespaces[ns][:short]}.join("").inspect}"],
+              [targets.map{|ns| namespaces[ns][:flag]}.inject(0, :|), "(#{targets.map{|ns| namespaces[ns][:long]}.join(" | ")})"],
             ].each do |flags, pretty_flags|
               context "with #{pretty_flags} flags" do
                 if (Gem.ruby_version < Gem::Version.create("2.3")) && targets.include?("pid")
@@ -313,8 +313,8 @@ RSpec.describe HrrRbLxns do
         context "with no map_uid/map_gid specified" do
           targets = ["user"]
           [
-            [targets.inject(""){|fs, t| fs + namespaces[t][:short]}, "#{targets.inject(""){|fs, t| fs + namespaces[t][:short]}.inspect}"       ],
-            [targets.inject(0 ){|fs, t| fs | namespaces[t][:flag ]}, "(#{targets.inject([]){|fs, t| fs + [namespaces[t][:long]]}.join(" | ")})"],
+            [targets.map{|ns| namespaces[ns][:short]}.join(""), "#{targets.map{|ns| namespaces[ns][:short]}.join("").inspect}"],
+            [targets.map{|ns| namespaces[ns][:flag]}.inject(0, :|), "(#{targets.map{|ns| namespaces[ns][:long]}.join(" | ")})"],
           ].each do |flags, pretty_flags|
             it "disassociates #{targets.inspect} namespaces and neither /proc/PID/uid_map nor /proc/PID/gid_map are created" do
               before = HrrRbLxns.files
@@ -355,8 +355,8 @@ RSpec.describe HrrRbLxns do
               options = {map_uid: uid_map[:option]}
               targets = ["user"]
               [
-                [targets.inject(""){|fs, t| fs + namespaces[t][:short]}, "#{targets.inject(""){|fs, t| fs + namespaces[t][:short]}.inspect}"       ],
-                [targets.inject(0 ){|fs, t| fs | namespaces[t][:flag ]}, "(#{targets.inject([]){|fs, t| fs + [namespaces[t][:long]]}.join(" | ")})"],
+                [targets.map{|ns| namespaces[ns][:short]}.join(""), "#{targets.map{|ns| namespaces[ns][:short]}.join("").inspect}"],
+                [targets.map{|ns| namespaces[ns][:flag]}.inject(0, :|), "(#{targets.map{|ns| namespaces[ns][:long]}.join(" | ")})"],
               ].each do |flags, pretty_flags|
                 it "disassociates #{targets.inspect} namespaces and writes /proc/PID/uid_map" do
                   before = HrrRbLxns.files
@@ -386,8 +386,8 @@ RSpec.describe HrrRbLxns do
               options = {map_gid: gid_map[:option]}
               targets = ["user"]
               [
-                [targets.inject(""){|fs, t| fs + namespaces[t][:short]}, "#{targets.inject(""){|fs, t| fs + namespaces[t][:short]}.inspect}"       ],
-                [targets.inject(0 ){|fs, t| fs | namespaces[t][:flag ]}, "(#{targets.inject([]){|fs, t| fs + [namespaces[t][:long]]}.join(" | ")})"],
+                [targets.map{|ns| namespaces[ns][:short]}.join(""), "#{targets.map{|ns| namespaces[ns][:short]}.join("").inspect}"],
+                [targets.map{|ns| namespaces[ns][:flag]}.inject(0, :|), "(#{targets.map{|ns| namespaces[ns][:long]}.join(" | ")})"],
               ].each do |flags, pretty_flags|
                 it "disassociates #{targets.inspect} namespaces and writes /proc/PID/gid_map and writes deny in /proc/PID/setgroups" do
                   before = HrrRbLxns.files
@@ -416,8 +416,8 @@ RSpec.describe HrrRbLxns do
             options = {map_uid: uid_maps[0][:option], map_gid: gid_maps[0][:option]}
             targets = ["user"]
             [
-              [targets.inject(""){|fs, t| fs + namespaces[t][:short]}, "#{targets.inject(""){|fs, t| fs + namespaces[t][:short]}.inspect}"       ],
-              [targets.inject(0 ){|fs, t| fs | namespaces[t][:flag ]}, "(#{targets.inject([]){|fs, t| fs + [namespaces[t][:long]]}.join(" | ")})"],
+              [targets.map{|ns| namespaces[ns][:short]}.join(""), "#{targets.map{|ns| namespaces[ns][:short]}.join("").inspect}"],
+              [targets.map{|ns| namespaces[ns][:flag]}.inject(0, :|), "(#{targets.map{|ns| namespaces[ns][:long]}.join(" | ")})"],
             ].each do |flags, pretty_flags|
               it "disassociates #{targets.inspect} namespaces and writes /proc/PID/uid_map and /proc/PID/gid_map and writes deny in /proc/PID/setgroups" do
                 before = HrrRbLxns.files
@@ -454,8 +454,8 @@ RSpec.describe HrrRbLxns do
             context "when options are #{spec[:options].inspect}" do
               targets = ["time"]
               [
-                [targets.inject(""){|fs, t| fs + namespaces[t][:short]}, "#{targets.inject(""){|fs, t| fs + namespaces[t][:short]}.inspect}"       ],
-                [targets.inject(0 ){|fs, t| fs | namespaces[t][:flag ]}, "(#{targets.inject([]){|fs, t| fs + [namespaces[t][:long]]}.join(" | ")})"],
+                [targets.map{|ns| namespaces[ns][:short]}.join(""), "#{targets.map{|ns| namespaces[ns][:short]}.join("").inspect}"],
+                [targets.map{|ns| namespaces[ns][:flag]}.inject(0, :|), "(#{targets.map{|ns| namespaces[ns][:long]}.join(" | ")})"],
               ].each do |flags, pretty_flags|
                 context "with #{pretty_flags} flags" do
                   it "disassociates #{targets.inspect} namespaces and writes /proc/PID/timens_offsets" do
@@ -503,8 +503,8 @@ RSpec.describe HrrRbLxns do
         namespaces.keys.combination(n).each do |targets|
           others  = namespaces.keys - targets
           [
-            [targets.inject(""){|fs, t| fs + namespaces[t][:short]}, "#{targets.inject(""){|fs, t| fs + namespaces[t][:short]}.inspect}"       ],
-            [targets.inject(0 ){|fs, t| fs | namespaces[t][:flag ]}, "(#{targets.inject([]){|fs, t| fs + [namespaces[t][:long]]}.join(" | ")})"],
+            [targets.map{|ns| namespaces[ns][:short]}.join(""), "#{targets.map{|ns| namespaces[ns][:short]}.join("").inspect}"],
+            [targets.map{|ns| namespaces[ns][:flag]}.inject(0, :|), "(#{targets.map{|ns| namespaces[ns][:long]}.join(" | ")})"],
           ].each do |flags, pretty_flags|
             context "with #{pretty_flags} flags" do
               unless targets.empty?
@@ -561,8 +561,8 @@ RSpec.describe HrrRbLxns do
             0.upto(namespaces.size) do |n|
               namespaces.keys.combination(n).each do |targets|
                 [
-                  [targets.inject(""){|fs, t| fs + namespaces[t][:short]}, "#{targets.inject(""){|fs, t| fs + namespaces[t][:short]}.inspect}"       ],
-                  [targets.inject(0 ){|fs, t| fs | namespaces[t][:flag ]}, "(#{targets.inject([]){|fs, t| fs + [namespaces[t][:long]]}.join(" | ")})"],
+                  [targets.map{|ns| namespaces[ns][:short]}.join(""), "#{targets.map{|ns| namespaces[ns][:short]}.join("").inspect}"],
+                  [targets.map{|ns| namespaces[ns][:flag]}.inject(0, :|), "(#{targets.map{|ns| namespaces[ns][:long]}.join(" | ")})"],
                 ].each do |flags, pretty_flags|
                   0.upto(n) do |m|
                     targets.combination(m).each do |options_targets|
@@ -615,8 +615,8 @@ RSpec.describe HrrRbLxns do
 
         targets = namespaces.keys
         [
-          [targets.inject(""){|fs, t| fs + namespaces[t][:short]}, "#{targets.inject(""){|fs, t| fs + namespaces[t][:short]}.inspect}"       ],
-          [targets.inject(0 ){|fs, t| fs | namespaces[t][:flag ]}, "(#{targets.inject([]){|fs, t| fs + [namespaces[t][:long]]}.join(" | ")})"],
+          [targets.map{|ns| namespaces[ns][:short]}.join(""), "#{targets.map{|ns| namespaces[ns][:short]}.join("").inspect}"],
+          [targets.map{|ns| namespaces[ns][:flag]}.inject(0, :|), "(#{targets.map{|ns| namespaces[ns][:long]}.join(" | ")})"],
         ].each do |flags, pretty_flags|
           context "with #{pretty_flags} flags" do
            it "associates #{targets.inspect} namespaces" do
